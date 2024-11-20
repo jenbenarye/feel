@@ -1,6 +1,3 @@
-# import os
-# os.environ['CUDA_VISIBLE_DEVICES'] = "3"
-
 import torch
 from dataclasses import dataclass
 
@@ -10,9 +7,6 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, HfArgumentParser
 
 from trl import KTOConfig, KTOTrainer, ModelConfig, get_peft_config, maybe_unpair_preference_dataset, setup_chat_format
 
-
-
-print(f'GPU number: {torch.cuda.current_device()}')
 
 
 # Define and parse arguments.
@@ -31,12 +25,12 @@ script_args = ScriptArguments(
 )
 
 training_args = KTOConfig(
-    output_dir="/raid/lingo/jen_ben/HF-RLHF/kto_oct_26", # MODFIFY
+    output_dir="/raid/lingo/jen_ben/HF-RLHF/kto_nov_2", # MODFIFY
     num_train_epochs=100,
-    per_device_train_batch_size=32,
+    per_device_train_batch_size=4,
     learning_rate=5e-7,
     lr_scheduler_type="cosine",
-    gradient_accumulation_steps=1,
+    gradient_accumulation_steps=8,
     logging_steps=10,
     eval_steps=500,
     warmup_ratio=0.1,
@@ -48,7 +42,6 @@ model_args = ModelConfig(
     model_name_or_path="trl-lib/qwen1.5-1.8b-sft",
     # any additional model-specific arguments
 )
-
 
 # Load a pretrained model
 model = AutoModelForCausalLM.from_pretrained(
@@ -63,6 +56,7 @@ print(f'loaded model')
 tokenizer = AutoTokenizer.from_pretrained(
     model_args.model_name_or_path, trust_remote_code=model_args.trust_remote_code
 )
+
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 

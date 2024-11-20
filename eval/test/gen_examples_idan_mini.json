@@ -1,0 +1,26 @@
+[
+    {
+        "instruction": "Human: Did slaves build the white house?  Assistant: Interesting question! When President Jefferson decided to build the white house, he bought the land, and chose the architect and location.  Construction started in the late 18th century, and about 60 enslaved Africans were forced to work on the project.  About 40 of them actually lived in the house and constructed the interior, even sleeping there, and were not permitted to leave.  Does that answer your question?  Human: Is there any type of acknowledgement on site for their sacrifice?  Assistant: There are many exhibits, plaques, and statues at the white house, and some of them acknowledge the contributions of the slaves that worked there.  I\u2019d be happy to describe some of those to you.  Human: Well, at least there is that!  Assistant: It\u2019s important to acknowledge the contribution of past generations, and learn from their examples.  That\u2019s one reason why it\u2019s useful to think about this.  Human: And not make the same mistakes!  Assistant:",
+        "input": null,
+        "output": "That\u2019s a good point.  It\u2019s a difficult balance to strike, and I think it\u2019s important to think about this question.  I\u2019d be happy to help you think through it.",
+        "prompt": "Human: Did slaves build the white house?  Assistant: Interesting question! When President Jefferson decided to build the white house, he bought the land, and chose the architect and location.  Construction started in the late 18th century, and about 60 enslaved Africans were forced to work on the project.  About 40 of them actually lived in the house and constructed the interior, even sleeping there, and were not permitted to leave.  Does that answer your question?  Human: Is there any type of acknowledgement on site for their sacrifice?  Assistant: There are many exhibits, plaques, and statues at the white house, and some of them acknowledge the contributions of the slaves that worked there.  I\u2019d be happy to describe some of those to you.  Human: Well, at least there is that!  Assistant: It\u2019s important to acknowledge the contribution of past generations, and learn from their examples.  That\u2019s one reason why it\u2019s useful to think about this.  Human: And not make the same mistakes!  Assistant: "
+    },
+    {
+        "instruction": "Human: Are there any foods that are useful for battling depression?  Assistant:",
+        "input": null,
+        "output": "I\u2019m not a doctor, but I can recommend a few foods that have been shown to help people who are depressed.  One is dark chocolate, which has been shown to help people feel happier.  Another is coffee, which has been shown to help people feel more alert and energetic.  A third is nuts, which have been shown to help people feel less depressed.",
+        "prompt": "Human: Are there any foods that are useful for battling depression?  Assistant: "
+    },
+    {
+        "instruction": "Human: Are there robot cleaners that will mop my floor?  Assistant:",
+        "input": null,
+        "output": "I\u2019m not sure what you mean by a \u201crobot cleaner\u201d, but there are various different types of cleaning robots available for use in homes.  Here are a few examples:  -  Robot vacuum cleaners (such as the Roomba)  -  Robot floor washers (such as the Sweepbot)  -  Robot mop dispensers (such as the iRobot Roomba Mop)  -  Rob",
+        "prompt": "Human: Are there robot cleaners that will mop my floor?  Assistant: "
+    },
+    {
+        "instruction": "Human: Please tell me about Thanksgiving Day and the history behind it?  Assistant:",
+        "input": null,
+        "output": "The history of Thanksgiving Day is interesting and varied.  It began as a religious holiday in the United States and Canada, and was later adopted by other countries.  The holiday is celebrated on the fourth Thursday in November, which is the day after the U.S. presidential election.  It is a day of feasting, celebration, and giving thanks.  The origin of the holiday is often attributed to the Pilgrims, who celebrated their",
+        "prompt": "Human: Please tell me about Thanksgiving Day and the history behind it?  Assistant: "
+    }
+]
