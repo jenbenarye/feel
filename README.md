@@ -22,9 +22,9 @@ Leverages feedback from users and automated RLHF pipelines to continuously impro
 
 
 
-# Dataset Schema for Project
+## Dataset Schema for Project
 
-## KTO Dataset Structure
+### KTO Dataset Structure
 
 The dataset should be organized into two splits: `train` and `test`.
 
