@@ -14,7 +14,8 @@ This repository hosts the development of an automated RLHF platform for Hugging 
 
 
 # The Feedback Collective
-Open RLHF on VLMs for Students
+
+**Open RLHF on VLMs for Students**
 
 A community-driven project to enhance Vision-Language Models (VLMs) for student-focused tasks.
 Leverages feedback from users and automated RLHF pipelines to continuously improve model performance and usability.
