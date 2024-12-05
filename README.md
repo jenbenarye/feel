@@ -13,4 +13,9 @@ Platform being developed at MIT in collaboration with HuggingFace. Aimed at impr
 This repository hosts the development of an automated RLHF platform for Hugging Face, where the community can provide real-time feedback on language models. The feedback is automatically integrated into an RLHF pipeline to continuously fine-tune and improve the models.
 
 
+# The Feedback Collective
+Open RLHF on VLMs for Students
+
+A community-driven project to enhance Vision-Language Models (VLMs) for student-focused tasks.
+Leverages feedback from users and automated RLHF pipelines to continuously improve model performance and usability.
 
