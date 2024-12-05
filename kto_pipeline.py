@@ -1,8 +1,8 @@
 import torch
 from dataclasses import dataclass
 from accelerate import PartialState
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from trl import KTOConfig, KTOTrainer, get_peft_config
+from transformers import AutoModelForCausalLM, AutoTokenizer, HfArgumentParser
+from trl import KTOConfig, KTOTrainer, ModelConfig, get_peft_config
 from kto_dataset_processor import process_dataset_ultrafeedback
 from datetime import datetime
 import wandb
@@ -12,24 +12,33 @@ import wandb
 ####################################
 
 @dataclass
-class Config:
+class ScriptArguments:
     """
     Configuration for the script.
     """
-    # Dataset settings
-    process_dataset_func: callable = process_dataset_ultrafeedback  # Dataset processing function
+    process_dataset_func: callable = process_dataset_ultrafeedback  # process_dataset function from kto_dataset_processor.py
+    checkpoint_path: str = None  # Checkpoint path
+    push_to_hub: bool = False  # Whether to push the model to the Hugging Face hub
 
-    # Model settings
-    model_name: str = "HuggingFaceH4/zephyr-7b-beta"  # Pretrained model name or path
+@dataclass
+class ModelArguments(ModelConfig):
+    """
+    Configuration for the model.
+    """
+    model_name: str = "HuggingFaceH4/zephyr-7b-beta"
     use_peft: bool = True
     lora_target_modules: str = "all-linear"
     lora_r: int = 16
     lora_alpha: int = 16
 
-    # Training settings
-    output_dir: str = f"kto_{model_name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+@dataclass
+class TrainingArguments(KTOConfig):
+    """
+    Configuration for the KTO trainer.
+    """
+    output_dir: str = f"kto_{ModelArguments.model_name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
     num_train_epochs: int = 1
-    per_device_train_batch_size: int = 4
+    per_device_train_batch_size: int = 4  # Highest that runs well
     learning_rate: float = 5e-7
     lr_scheduler_type: str = "cosine"
     gradient_accumulation_steps: int = 1
@@ -39,28 +48,30 @@ class Config:
     bf16: bool = True
     logging_first_step: bool = True
 
-    # Checkpoint and hub settings
-    checkpoint_path: str = None
-    push_to_hub: bool = False
 
-# Initialize the unified configuration
-config = Config()
+
+# Initialize configurations
+script_args = ScriptArguments()
+training_args = TrainingArguments()
+model_args = ModelArguments()
 
 ####################################
 #  HELPER FUNCTIONS
 ####################################
 
-def load_model_and_tokenizer(config):
+def load_model_and_tokenizer(model_args):
     """
     Load a model and tokenizer from a specified path.
     """
     model = AutoModelForCausalLM.from_pretrained(
-        config.model_name,
+        model_args.model_name,
+        trust_remote_code=model_args.trust_remote_code,
         torch_dtype=torch.float16,
         device_map="auto"
     )
     tokenizer = AutoTokenizer.from_pretrained(
-        config.model_name
+        model_args.model_name,
+        trust_remote_code=model_args.trust_remote_code
     )
 
     # Set pad token if missing
@@ -79,13 +90,13 @@ def main():
 
     # Load models and tokenizer
     print("Loading models and tokenizer...")
-    model, tokenizer = load_model_and_tokenizer(config)
-    ref_model, _ = load_model_and_tokenizer(config)
+    model, tokenizer = load_model_and_tokenizer(model_args)
+    ref_model, _ = load_model_and_tokenizer(model_args)
     print("Models and tokenizer loaded.")
 
-    # Load and process datasets using the specified function
+    # Load and process datasets using external function
     print("Processing dataset...")
-    dataset = config.process_dataset_func()
+    dataset = process_dataset_ultrafeedback()
     print("Dataset processed.")
 
     # Initialize trainer
@@ -93,28 +104,11 @@ def main():
     trainer = KTOTrainer(
         model=model,
         ref_model=ref_model,
-        args=KTOConfig(
-            output_dir=config.output_dir,
-            num_train_epochs=config.num_train_epochs,
-            per_device_train_batch_size=config.per_device_train_batch_size,
-            learning_rate=config.learning_rate,
-            lr_scheduler_type=config.lr_scheduler_type,
-            gradient_accumulation_steps=config.gradient_accumulation_steps,
-            logging_steps=config.logging_steps,
-            eval_steps=config.eval_steps,
-            warmup_ratio=config.warmup_ratio,
-            bf16=config.bf16,
-            logging_first_step=config.logging_first_step,
-        ),
+        args=training_args,
         train_dataset=dataset["train"],
         eval_dataset=dataset["test"],
         tokenizer=tokenizer,
-        peft_config=get_peft_config({
-            "use_peft": config.use_peft,
-            "lora_target_modules": config.lora_target_modules,
-            "lora_r": config.lora_r,
-            "lora_alpha": config.lora_alpha,
-        }),
+        peft_config=get_peft_config(model_args),
     )
 
     # Training
@@ -130,11 +124,25 @@ def main():
     trainer.save_metrics("eval", metrics)
 
     # Log metrics to wandb
-    wandb.log(metrics)
+    wandb.log({
+        "epoch": metrics.get("epoch"),
+        "grad_norm": metrics.get("grad_norm"),
+        "kl": metrics.get("kl"),
+        "learning_rate": metrics.get("learning_rate"),
+        "logits/chosen": metrics.get("logits/chosen"),
+        "logits/rejected": metrics.get("logits/rejected"),
+        "logps/chosen": metrics.get("logps/chosen"),
+        "logps/rejected": metrics.get("logps/rejected"),
+        "loss": metrics.get("loss"),
+        "rewards/chosen": metrics.get("rewards/chosen"),
+        "rewards/margins": metrics.get("rewards/margins"),
+        "rewards/rejected": metrics.get("rewards/rejected"),
+        "step": metrics.get("step")
+    })
 
     # Save model and optionally push to hub
-    trainer.save_model(config.output_dir)
-    if config.push_to_hub:
+    trainer.save_model(training_args.output_dir)
+    if script_args.push_to_hub:
         trainer.push_to_hub()
 
     print("Process completed.")
