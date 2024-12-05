@@ -2,7 +2,7 @@ import torch
 from dataclasses import dataclass
 from accelerate import PartialState
 from transformers import AutoModelForCausalLM, AutoTokenizer, HfArgumentParser
-from trl import KTOConfig, KTOTrainer, ModelConfig, get_peft_config
+from trl import KTOConfig, KTOTrainer, ModelConfig, get_peft_config, maybe_unpair_preference_dataset, setup_chat_format
 from kto_dataset_processor import process_dataset_ultrafeedback
 from datetime import datetime
 import wandb
@@ -78,7 +78,44 @@ def load_model_and_tokenizer(model_args):
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    # Setup chat format if not present
+    if tokenizer.chat_template is None:
+        model, tokenizer = setup_chat_format(model, tokenizer)
+
+
+
     return model, tokenizer
+
+
+# def find_unknown_tokens(tokenizer, texts):
+#     """
+#     Identify tokens in the dataset that are not in the tokenizer's vocabulary.
+#     """
+#     all_tokens = set()
+#     for text in texts:
+#         tokens = tokenizer.tokenize(text)
+#         all_tokens.update(tokens)
+#     vocab = set(tokenizer.get_vocab().keys())
+#     unknown_tokens = all_tokens - vocab
+#     return unknown_tokens
+
+
+# def add_tokens_to_tokenizer(tokenizer, model, dataset):
+#     """
+#     Extend the tokenizer's vocabulary with missing tokens and resize the model embeddings.
+#     """
+#     # Extract all texts from the dataset
+#     texts = [example["completion"] for example in dataset["train"]]
+
+#     # Identify unknown tokens
+#     unknown_tokens = find_unknown_tokens(tokenizer, texts)
+#     print(f"Found {len(unknown_tokens)} unknown tokens: {list(unknown_tokens)[:10]}...")
+
+#     # Add unknown tokens to tokenizer
+#     tokenizer.add_tokens(list(unknown_tokens))
+#     model.resize_token_embeddings(len(tokenizer))
+#     print(f"Tokenizer vocabulary size after extension: {len(tokenizer)}")
+
 
 ####################################
 #  MAIN LOGIC
@@ -98,6 +135,11 @@ def main():
     print("Processing dataset...")
     dataset = process_dataset_ultrafeedback()
     print("Dataset processed.")
+
+    # # Extend tokenizer with missing tokens
+    # print("Adding unknown tokens to tokenizer...")
+    # add_tokens_to_tokenizer(tokenizer, model, dataset)
+    # print("Tokenizer updated.")
 
     # Initialize trainer
     print("Initializing trainer...")
