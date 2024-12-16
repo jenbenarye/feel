@@ -1,0 +1,18 @@
+[project]
+name = "ohp"
+version = "0.1.0"
+description = "A human feedback project"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "datasets>=3.1.0",
+]
+
+[dependency-groups]
+ml = [
+    "trl>=0.12.2",
+]
+app = [
+    "gradio>=5.8.0",
+    "huggingface-hub>=0.26.5",
+]
