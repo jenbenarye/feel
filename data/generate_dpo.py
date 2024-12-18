@@ -10,7 +10,7 @@ from typing_extensions import override
 
 CHOSEN_TEMPLATE = """
 You are provide with a conversation between a human and an AI assistant. 
-The final message has been rated negatively. Your task is to regenerate the response.
+The final message is of poort quality positively. Your task is to regenerate one of high quality.
 {% for message in conversation %}
 {{ message["role"] }}: {{ message["content"] }}
 {% endfor %}
