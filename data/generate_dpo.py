@@ -10,25 +10,25 @@ from typing_extensions import override
 
 CHOSEN_TEMPLATE = """
 You are provide with a conversation between a human and an AI assistant. 
-The final message has been rated negatively. Your task is to regenerate the response.
+The final message is of poor quality positively. Your task is to regenerate one of high quality.
 {% for message in conversation %}
 {{ message["role"] }}: {{ message["content"] }}
 {% endfor %}
-Replacement improved message:
+High quality response:
 """.rstrip()
 
-CHOSEN_SYSTEM_PROMPT = "You are a helpful AI assistant. Your task is to regenerate high quality responses to user queries, when other assistants go wrong."
+CHOSEN_SYSTEM_PROMPT = "You are a helpful AI assistant. Your task is to generate high quality response when other assistants created a poor quality response."
 
 REJECT_TEMPLATE = """
 You are provide with a conversation between a human and an AI assistant.
-The final message has been rated positively. Your task is to regenerate a POOR QUALITYresponse.
+The final message is of high quality positively. Your task is to regenerate one of poor quality.
 {% for message in conversation %}
 {{ message["role"] }}: {{ message["content"] }}
 {% endfor %}
-Replacement improved message:
+Poor quality response:
 """.rstrip()
 
-REJECT_SYSTEM_PROMPT = "You are a helpful AI assistant. Your task is to regenerate high quality responses to user queries, when other assistants go wrong."
+REJECT_SYSTEM_PROMPT = "You are a helpful AI assistant. Your task is to generate a poor quality response when other assistants created a high quality response."
 
 
 class FilterConversationRatings(Step):
