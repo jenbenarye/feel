@@ -9,7 +9,7 @@ app_file: app/app.py
 pinned: false
 ---
 
-# Feel 
+# Feel
 
 This is a project to create a continuous training application.
 
@@ -48,11 +48,11 @@ To install the required dependencies, run the following commands:
 ### ML Dependencies
 
 ```bash
-uv install ml
+uv pip install ".[ml]"
 ```
 
 ### App Dependencies
 
 ```bash
-uv install app
+uv pip install ".[app]"
 ```

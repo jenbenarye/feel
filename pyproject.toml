@@ -10,6 +10,12 @@ dependencies = [
     "ipykernel>=6.29.5",
 ]
 
+[tool.setuptools.packages.find]
+where = [
+    "ml",
+    "app",
+]
+
 [dependency-groups]
 ml = [
     "trl>=0.12.2",
