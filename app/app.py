@@ -140,8 +140,8 @@ def wrangle_edit_data(x: gr.EditData, history: list) -> list:
     else:
         index = x.index[0]
 
+    history = history[:index]
     if history[index]["role"] == "user":
-        history = history[:index]
         return respond_system_message(history)
     else:
         return history
