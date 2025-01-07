@@ -4,12 +4,12 @@ emoji: 🚀
 colorFrom: blue
 colorTo: gray
 sdk: gradio
-sdk_version: 5.8.0
+sdk_version: 5.10.0
 app_file: app/app.py
 pinned: false
 ---
 
-# Feel 
+# Feel
 
 This is a project to create a continuous training application.
 
