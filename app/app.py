@@ -125,10 +125,12 @@ def wrangle_like_data(x: gr.LikeData, history) -> DataFrame:
         elif rating == "disliked":
             message["rating"] = -1
         else:
-            message["rating"] = None
+            message["rating"] = 0
 
         output_data.append(
-            dict([(k, v) for k, v in message.items() if k != "metadata"])
+            dict(
+                [(k, v) for k, v in message.items() if k not in ["metadata", "options"]]
+            )
         )
 
     return history, DataFrame(data=output_data)
