@@ -143,8 +143,7 @@ def wrangle_edit_data(x: gr.EditData, history: list) -> list:
     history = history[:index]
     if history[index]["role"] == "user":
         return respond_system_message(history)
-    else:
-        return history
+    return history
 
 
 def submit_conversation(dataframe, session_id):
