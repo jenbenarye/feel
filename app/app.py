@@ -83,11 +83,11 @@ def _process_content(content) -> str | list[str]:
     return content
 
 
-def remove_last_message(history: list) -> list:
+def remove_last_message(x: gr.UndoData, history: list) -> list:
     return history[:-1]
 
 
-def retry_respond_system_message(history: list) -> list:
+def retry_respond_system_message(x: gr.RetryData, history: list) -> list:
     """Respond to the user message with a system message"""
     history = remove_last_message(history)
     return respond_system_message(history)
@@ -143,7 +143,7 @@ def wrangle_edit_data(x: gr.EditData, history: list) -> list:
         index = x.index[0]
 
     history = history[:index]
-    if history[index]["role"] == "user":
+    if history[-1]["role"] == "user":
         return respond_system_message(history)
     return history
 
