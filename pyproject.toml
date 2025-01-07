@@ -15,6 +15,6 @@ ml = [
     "trl>=0.12.2",
 ]
 app = [
-    "gradio>=5.8.0",
+    "gradio>=5.10.0",
     "huggingface-hub>=0.26.5",
 ]

@@ -9,7 +9,7 @@ app_file: app/app.py
 pinned: false
 ---
 
-# Feel 
+# Feel
 
 This is a project to create a continuous training application.
 
@@ -40,19 +40,34 @@ app/               # Directory for application code
 
 ## Installation
 
-The repository uses `uv` for managing virtual environments. To install `uv`, go [here](https://docs.astral.sh/uv/getting-started/installation/).
+The repository uses `uv` for managing virtual environments. To install `uv`, go [here](https://docs.astral.sh/uv/getting-started/installation/). Create a virtual environment.
 
+```bash
+uv venv --python 3.11
+```
+
+Activate the virtual environment
+
+```bash
+source .venv/bin/activate
+```
+
+Sync the dependencies
+
+```bash
+uv sync --all-groups
+```
 
 To install the required dependencies, run the following commands:
 
 ### ML Dependencies
 
 ```bash
-uv install ml
+uv sync --group ml
 ```
 
 ### App Dependencies
 
 ```bash
-uv install app
+uv sync --group app
 ```
