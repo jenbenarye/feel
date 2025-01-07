@@ -141,7 +141,6 @@ def wrangle_like_data(x: gr.LikeData, history) -> DataFrame:
 
     output_data = []
     for idx, message in enumerate(history):
-        print(message)
         if isinstance(message, gr.ChatMessage):
             message = message.__dict__
         if idx == liked_index:
