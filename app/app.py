@@ -192,9 +192,7 @@ def wrangle_edit_data(
     original_message = gr.ChatMessage(
         role="assistant", content=dataframe.iloc[index]["content"]
     ).__dict__
-    import pdb
 
-    pdb.set_trace()
     if history[index]["role"] == "user":
         # Add feedback on original and corrected message
         add_fake_like_data(history[: index + 2], session_id, liked=True)
