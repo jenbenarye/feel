@@ -6,10 +6,9 @@ from mimetypes import guess_type
 from pathlib import Path
 
 import gradio as gr
+from feedback import save_feedback
 from huggingface_hub import InferenceClient
 from pandas import DataFrame
-
-from feedback import save_feedback
 
 client = InferenceClient(
     token=os.getenv("HF_TOKEN"),
@@ -30,7 +29,7 @@ def add_user_message(history, message):
     return history, gr.MultimodalTextbox(value=None, interactive=False)
 
 
-def _format_history_as_messages(history: list):
+def format_history_as_messages(history: list):
     messages = []
     current_role = None
     current_message_content = []
@@ -84,17 +83,25 @@ def _process_content(content) -> str | list[str]:
     return content
 
 
+def remove_last_message(history: list) -> list:
+    return history[:-1]
+
+
+def retry_respond_system_message(history: list) -> list:
+    """Respond to the user message with a system message"""
+    history = remove_last_message(history)
+    return respond_system_message(history)
+
+
 def respond_system_message(history: list) -> list:  # -> list:
     """Respond to the user message with a system message"""
-    messages = _format_history_as_messages(history)
+    messages = format_history_as_messages(history)
     response = client.chat.completions.create(
         messages=messages,
         max_tokens=2000,
         stream=False,
     )
     content = response.choices[0].message.content
-    # TODO: Add a response to the user message
-
     message = gr.ChatMessage(role="assistant", content=content)
     history.append(message)
     return history
@@ -103,7 +110,10 @@ def respond_system_message(history: list) -> list:  # -> list:
 def wrangle_like_data(x: gr.LikeData, history) -> DataFrame:
     """Wrangle conversations and liked data into a DataFrame"""
 
-    liked_index = x.index[0]
+    if isinstance(x.index, int):
+        liked_index = x.index
+    else:
+        liked_index = x.index[0]
 
     output_data = []
     for idx, message in enumerate(history):
@@ -122,6 +132,19 @@ def wrangle_like_data(x: gr.LikeData, history) -> DataFrame:
         )
 
     return history, DataFrame(data=output_data)
+
+
+def wrangle_edit_data(x: gr.EditData, history: list) -> list:
+    if isinstance(x.index, int):
+        index = x.index
+    else:
+        index = x.index[0]
+
+    if history[index]["role"] == "user":
+        history = history[:index]
+        return respond_system_message(history)
+    else:
+        return history
 
 
 def submit_conversation(dataframe, session_id):
@@ -154,8 +177,10 @@ with gr.Blocks() as demo:
 
     chatbot = gr.Chatbot(
         elem_id="chatbot",
+        editable="all",
         bubble_full_width=False,
         type="messages",
+        feedback_options=["Like", "Dislike"],
     )
 
     chat_input = gr.MultimodalTextbox(
@@ -187,6 +212,24 @@ with gr.Blocks() as demo:
         inputs=[chatbot],
         outputs=[chatbot, dataframe],
         like_user_message=False,
+    )
+
+    chatbot.retry(
+        fn=retry_respond_system_message,
+        inputs=[chatbot],
+        outputs=[chatbot],
+    )
+
+    chatbot.edit(
+        fn=wrangle_edit_data,
+        inputs=[chatbot],
+        outputs=[chatbot],
+    )
+
+    chatbot.undo(
+        fn=remove_last_message,
+        inputs=[chatbot],
+        outputs=[chatbot],
     )
 
     gr.Button(
