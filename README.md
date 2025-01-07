@@ -42,17 +42,24 @@ app/               # Directory for application code
 
 The repository uses `uv` for managing virtual environments. To install `uv`, go [here](https://docs.astral.sh/uv/getting-started/installation/).
 
+```bash
+uv venv --python 3.11
+```
+
+```bash
+source .venv/bin/activate
+```
 
 To install the required dependencies, run the following commands:
 
 ### ML Dependencies
 
 ```bash
-uv pip install ".[ml]"
+uv sync --group ml
 ```
 
 ### App Dependencies
 
 ```bash
-uv pip install ".[app]"
+uv sync --group app
 ```

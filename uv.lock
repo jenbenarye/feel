@@ -1111,7 +1111,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 app = [
-    { name = "gradio", specifier = ">=5.8.0" },
+    { name = "gradio", specifier = ">=5.10.0" },
     { name = "huggingface-hub", specifier = ">=0.26.5" },
 ]
 ml = [{ name = "trl", specifier = ">=0.12.2" }]
