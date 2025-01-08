@@ -223,8 +223,10 @@ def wrangle_edit_data(
 
     if history[index]["role"] == "user":
         # Add feedback on original and corrected message
-        add_fake_like_data(history[: index + 2], session_id, liked=True)
-        add_fake_like_data(history[: index + 1] + [original_message], session_id)
+        add_fake_like_data(history[: index + 2], session_id, language, liked=True)
+        add_fake_like_data(
+            history[: index + 1] + [original_message], session_id, language
+        )
         history = respond_system_message(
             history[: index + 1],
             temperature=random.randint(1, 100) / 100,
@@ -233,8 +235,8 @@ def wrangle_edit_data(
         return history
     else:
         # Add feedback on original and corrected message
-        add_fake_like_data(history[: index + 1], session_id, liked=True)
-        add_fake_like_data(history[:index] + [original_message], session_id)
+        add_fake_like_data(history[: index + 1], session_id, language, liked=True)
+        add_fake_like_data(history[:index] + [original_message], session_id, language)
         history = history[: index + 1]
         # add chosen and rejected options
         history[-1]["options"] = [
@@ -263,15 +265,15 @@ def wrangle_retry_data(
 
 def submit_conversation(dataframe, session_id, language):
     """ "Submit the conversation to dataset repo"""
-    if "role" in dataframe.columns:
-        dataframe = dataframe[dataframe["role"] != "system"]
     if dataframe.empty or len(dataframe) < 2:
         gr.Info("No feedback to submit.")
         return (gr.Dataframe(value=None, interactive=False), [])
 
     dataframe["content"] = dataframe["content"].apply(_process_content)
+    conversation = dataframe.to_dict(orient="records")
+    conversation = conversation[1:]  # remove system message
     conversation_data = {
-        "conversation": dataframe.to_dict(orient="records"),
+        "conversation": conversation,
         "timestamp": datetime.now().isoformat(),
         "session_id": session_id,
         "conversation_id": str(uuid.uuid4()),
@@ -283,11 +285,13 @@ def submit_conversation(dataframe, session_id, language):
 
 
 css = """
-.options {
+.options.svelte-pcaovb {
+    display: none !important;
+}
+.option.svelte-pcaovb {
     display: none !important;
 }
 """
-
 
 with gr.Blocks(css=css) as demo:
     ##############################
@@ -299,9 +303,7 @@ with gr.Blocks(css=css) as demo:
         visible=False,
     )
 
-    language = gr.Dropdown(
-        label="Language", choices=LANGUAGES, value=LANGUAGES[0], interactive=True
-    )
+    language = gr.Dropdown(choices=LANGUAGES, label="Language", interactive=True)
 
     chatbot = gr.Chatbot(
         elem_id="chatbot",
