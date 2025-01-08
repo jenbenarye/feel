@@ -71,3 +71,16 @@ uv sync --group ml
 ```bash
 uv sync --group app
 ```
+
+## Sync with Hugging Face Space
+
+First, add the remote
+```
+git remote add hf https://huggingface.co/spaces/feel-fl/open-human-feedback-chat
+```
+
+Push to the remote branch
+
+```
+git push hf main
+```
