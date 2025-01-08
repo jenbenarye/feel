@@ -215,18 +215,6 @@ def wrangle_edit_data(
         return history
 
 
-def wrangle_undo_data(
-    x: gr.UndoData, history: list, dataframe: DataFrame, session_id: str
-) -> list:
-    """Undo the last turn and add negative feedback on the original message
-
-    Return the history without the last turn"""
-    add_fake_like_data(history, session_id)
-    # Return the history without the last turn
-    history = history[:-2]
-    return history, update_dataframe(dataframe, history)
-
-
 def wrangle_retry_data(
     x: gr.RetryData, history: list, dataframe: DataFrame, session_id: str
 ) -> list:
@@ -331,12 +319,6 @@ with gr.Blocks(css=css) as demo:
         inputs=[chatbot, dataframe, session_id],
         outputs=[chatbot],
     ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe])
-
-    chatbot.undo(
-        fn=wrangle_undo_data,
-        inputs=[chatbot, dataframe, session_id],
-        outputs=[chatbot, dataframe],
-    )
 
     submit_btn.click(
         fn=submit_conversation,
