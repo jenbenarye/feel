@@ -13,7 +13,7 @@ from gradio.components.chatbot import Option
 from huggingface_hub import InferenceClient
 from pandas import DataFrame
 
-LANGUAGES = ["English", "Spanish", "Hebrew", "Dutch"]
+LANGUAGES: list[str] = ["English", "Spanish", "Hebrew", "Dutch"]
 
 client = InferenceClient(
     token=os.getenv("HF_TOKEN"),
@@ -34,6 +34,17 @@ def add_user_message(history, message):
     return history, gr.MultimodalTextbox(value=None, interactive=False)
 
 
+def get_system_message(language: str) -> str:
+    if language == "English":
+        return "You are a helpful assistant that speaks English."
+    elif language == "Spanish":
+        return "Tu eres un asistente útil que habla español."
+    elif language == "Hebrew":
+        return "אתה עוזר טוב שמפגש בעברית."
+    elif language == "Dutch":
+        return "Je bent een handige assistent die Nederlands spreekt."
+
+
 def format_system_message(language: str, history: list):
     if history:
         if history[0]["role"] == "system":
@@ -41,7 +52,7 @@ def format_system_message(language: str, history: list):
     system_message = [
         {
             "role": "system",
-            "content": f"You are a helpful assistant that speaks {language}.",
+            "content": get_system_message(language),
         }
     ]
     history = system_message + history
@@ -286,8 +297,9 @@ with gr.Blocks(css=css) as demo:
     language = gr.Dropdown(
         label="Language",
         choices=LANGUAGES,
-        # value="English",
+        value=LANGUAGES[0],
         interactive=True,
+        max_choices=1,
     )
 
     chatbot = gr.Chatbot(
@@ -297,7 +309,7 @@ with gr.Blocks(css=css) as demo:
         value=[
             {
                 "role": "system",
-                "content": "You are a helpful assistant that speaks English.",
+                "content": get_system_message(language.value),
             }
         ],
         type="messages",
