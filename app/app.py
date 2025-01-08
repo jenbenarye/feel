@@ -102,13 +102,13 @@ def _is_file_safe(path) -> bool:
     try:
         return Path(path).is_file()
     except Exception:
-        return False
+        return ""
 
 
 def _process_content(content) -> str | list[str]:
     if isinstance(content, str) and _is_file_safe(content):
         return _convert_path_to_data_uri(content)
-    elif isinstance(content, list):
+    elif isinstance(content, list) or isinstance(content, tuple):
         return _convert_path_to_data_uri(content[0])
     return content
 
