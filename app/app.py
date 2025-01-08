@@ -113,16 +113,18 @@ def _process_content(content) -> str | list[str]:
     return content
 
 
-def add_fake_like_data(history: list, session_id: str, liked: bool = False) -> None:
+def add_fake_like_data(
+    history: list, session_id: str, language: str, liked: bool = False
+) -> None:
     data = {
         "index": len(history) - 1,
         "value": history[-1],
-        "liked": True,
+        "liked": liked,
     }
     _, dataframe = wrangle_like_data(
         gr.LikeData(target=None, data=data), history.copy()
     )
-    submit_conversation(dataframe, session_id)
+    submit_conversation(dataframe, session_id, language)
 
 
 def respond_system_message(
@@ -205,7 +207,7 @@ def wrangle_like_data(x: gr.LikeData, history) -> DataFrame:
 
 
 def wrangle_edit_data(
-    x: gr.EditData, history: list, dataframe: DataFrame, session_id: str
+    x: gr.EditData, history: list, dataframe: DataFrame, session_id: str, language: str
 ) -> list:
     """Edit the conversation and add negative feedback if assistant message is edited, otherwise regenerate the message
 
@@ -243,12 +245,12 @@ def wrangle_edit_data(
 
 
 def wrangle_retry_data(
-    x: gr.RetryData, history: list, dataframe: DataFrame, session_id: str
+    x: gr.RetryData, history: list, dataframe: DataFrame, session_id: str, language: str
 ) -> list:
     """Respond to the user message with a system message and add negative feedback on the original message
 
     Return the history with the new message"""
-    add_fake_like_data(history, session_id)
+    add_fake_like_data(history, session_id, language)
 
     # Return the history without a new message
     history = respond_system_message(
@@ -259,10 +261,12 @@ def wrangle_retry_data(
     return history, update_dataframe(dataframe, history)
 
 
-def submit_conversation(dataframe, session_id):
+def submit_conversation(dataframe, session_id, language):
     """ "Submit the conversation to dataset repo"""
-    if dataframe.empty:
-        gr.Info("No messages to submit because the conversation was empty")
+    if "role" in dataframe.columns:
+        dataframe = dataframe[dataframe["role"] != "system"]
+    if dataframe.empty or len(dataframe) < 2:
+        gr.Info("No feedback to submit.")
         return (gr.Dataframe(value=None, interactive=False), [])
 
     dataframe["content"] = dataframe["content"].apply(_process_content)
@@ -271,9 +275,10 @@ def submit_conversation(dataframe, session_id):
         "timestamp": datetime.now().isoformat(),
         "session_id": session_id,
         "conversation_id": str(uuid.uuid4()),
+        "language": language,
     }
     save_feedback(input_object=conversation_data)
-    gr.Info(f"Submitted {len(dataframe)} messages to the dataset")
+    gr.Info("Submitted your feedback!")
     return (gr.Dataframe(value=None, interactive=False), [])
 
 
@@ -295,11 +300,7 @@ with gr.Blocks(css=css) as demo:
     )
 
     language = gr.Dropdown(
-        label="Language",
-        choices=LANGUAGES,
-        value=LANGUAGES[0],
-        interactive=True,
-        max_choices=1,
+        label="Language", choices=LANGUAGES, value=LANGUAGES[0], interactive=True
     )
 
     chatbot = gr.Chatbot(
@@ -357,19 +358,19 @@ with gr.Blocks(css=css) as demo:
 
     chatbot.retry(
         fn=wrangle_retry_data,
-        inputs=[chatbot, dataframe, session_id],
+        inputs=[chatbot, dataframe, session_id, language],
         outputs=[chatbot, dataframe],
     )
 
     chatbot.edit(
         fn=wrangle_edit_data,
-        inputs=[chatbot, dataframe, session_id],
+        inputs=[chatbot, dataframe, session_id, language],
         outputs=[chatbot],
     ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe])
 
     submit_btn.click(
         fn=submit_conversation,
-        inputs=[dataframe, session_id],
+        inputs=[dataframe, session_id, language],
         outputs=[dataframe, chatbot],
     )
     demo.load(
