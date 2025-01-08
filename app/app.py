@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 import gradio as gr
-from feedback import save_feedback
+from feedback import save_feedback, scheduler
 from gradio.components.chatbot import Option
 from huggingface_hub import InferenceClient
 from pandas import DataFrame
@@ -297,13 +297,29 @@ with gr.Blocks(css=css) as demo:
     ##############################
     # Chatbot
     ##############################
+    gr.Markdown("""
+    # ♾️ FeeL - a real-time Feedback Loop for LMs
+    """)
+
+    with gr.Accordion("Explanation") as explanation:
+        gr.Markdown(f"""
+        FeeL is a collaboration between Hugging Face and MIT. It is a community-driven project to provide a real-time feedback loop for VLMs, where your feedback is continuously used to train the model. The [dataset](https://huggingface.co/datasets/{scheduler.repo_id}) and [code](https://github.com/huggingface/feel) are public.
+
+        Start by selecting your language, chat with the model with text and images and provide feedback in different ways.
+
+        - ✏️ Edit a message
+        - 👍/👎 Like or dislike a message
+        - 🔄 Regenerate a message
+
+        Some feedback is automatically submitted allowing you to continue chatting, but you can also submit and reset the conversation by clicking "💾 Submit conversation" (under the chat) or trash the conversation by clicking "🗑️" (upper right corner).
+        """)
+        language = gr.Dropdown(choices=LANGUAGES, label="Language", interactive=True)
+
     session_id = gr.Textbox(
         interactive=False,
         value=str(uuid.uuid4()),
         visible=False,
     )
-
-    language = gr.Dropdown(choices=LANGUAGES, label="Language", interactive=True)
 
     chatbot = gr.Chatbot(
         elem_id="chatbot",
@@ -327,10 +343,10 @@ with gr.Blocks(css=css) as demo:
         submit_btn=True,
     )
 
-    dataframe = gr.Dataframe(wrap=True)
+    dataframe = gr.Dataframe(wrap=True, label="Collected feedback")
 
     submit_btn = gr.Button(
-        value="Submit conversation",
+        value="💾 Submit conversation",
     )
 
     ##############################
