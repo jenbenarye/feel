@@ -13,6 +13,8 @@ from gradio.components.chatbot import Option
 from huggingface_hub import InferenceClient
 from pandas import DataFrame
 
+LANGUAGES: list[str] = ["English", "Spanish", "Hebrew", "Dutch"]
+
 client = InferenceClient(
     token=os.getenv("HF_TOKEN"),
     model=(
@@ -30,6 +32,31 @@ def add_user_message(history, message):
     if message["text"] is not None:
         history.append({"role": "user", "content": message["text"]})
     return history, gr.MultimodalTextbox(value=None, interactive=False)
+
+
+def get_system_message(language: str) -> str:
+    if language == "English":
+        return "You are a helpful assistant that speaks English."
+    elif language == "Spanish":
+        return "Tu eres un asistente útil que habla español."
+    elif language == "Hebrew":
+        return "אתה עוזר טוב שמפגש בעברית."
+    elif language == "Dutch":
+        return "Je bent een handige assistent die Nederlands spreekt."
+
+
+def format_system_message(language: str, history: list):
+    if history:
+        if history[0]["role"] == "system":
+            history = history[1:]
+    system_message = [
+        {
+            "role": "system",
+            "content": get_system_message(language),
+        }
+    ]
+    history = system_message + history
+    return history
 
 
 def format_history_as_messages(history: list):
@@ -86,16 +113,18 @@ def _process_content(content) -> str | list[str]:
     return content
 
 
-def add_fake_like_data(history: list, session_id: str, liked: bool = False) -> None:
+def add_fake_like_data(
+    history: list, session_id: str, language: str, liked: bool = False
+) -> None:
     data = {
         "index": len(history) - 1,
         "value": history[-1],
-        "liked": True,
+        "liked": liked,
     }
     _, dataframe = wrangle_like_data(
         gr.LikeData(target=None, data=data), history.copy()
     )
-    submit_conversation(dataframe, session_id)
+    submit_conversation(dataframe, session_id, language)
 
 
 def respond_system_message(
@@ -178,7 +207,7 @@ def wrangle_like_data(x: gr.LikeData, history) -> DataFrame:
 
 
 def wrangle_edit_data(
-    x: gr.EditData, history: list, dataframe: DataFrame, session_id: str
+    x: gr.EditData, history: list, dataframe: DataFrame, session_id: str, language: str
 ) -> list:
     """Edit the conversation and add negative feedback if assistant message is edited, otherwise regenerate the message
 
@@ -194,8 +223,10 @@ def wrangle_edit_data(
 
     if history[index]["role"] == "user":
         # Add feedback on original and corrected message
-        add_fake_like_data(history[: index + 2], session_id, liked=True)
-        add_fake_like_data(history[: index + 1] + [original_message], session_id)
+        add_fake_like_data(history[: index + 2], session_id, language, liked=True)
+        add_fake_like_data(
+            history[: index + 1] + [original_message], session_id, language
+        )
         history = respond_system_message(
             history[: index + 1],
             temperature=random.randint(1, 100) / 100,
@@ -204,8 +235,8 @@ def wrangle_edit_data(
         return history
     else:
         # Add feedback on original and corrected message
-        add_fake_like_data(history[: index + 1], session_id, liked=True)
-        add_fake_like_data(history[:index] + [original_message], session_id)
+        add_fake_like_data(history[: index + 1], session_id, language, liked=True)
+        add_fake_like_data(history[:index] + [original_message], session_id, language)
         history = history[: index + 1]
         # add chosen and rejected options
         history[-1]["options"] = [
@@ -216,12 +247,12 @@ def wrangle_edit_data(
 
 
 def wrangle_retry_data(
-    x: gr.RetryData, history: list, dataframe: DataFrame, session_id: str
+    x: gr.RetryData, history: list, dataframe: DataFrame, session_id: str, language: str
 ) -> list:
     """Respond to the user message with a system message and add negative feedback on the original message
 
     Return the history with the new message"""
-    add_fake_like_data(history, session_id)
+    add_fake_like_data(history, session_id, language)
 
     # Return the history without a new message
     history = respond_system_message(
@@ -232,30 +263,35 @@ def wrangle_retry_data(
     return history, update_dataframe(dataframe, history)
 
 
-def submit_conversation(dataframe, session_id):
+def submit_conversation(dataframe, session_id, language):
     """ "Submit the conversation to dataset repo"""
-    if dataframe.empty:
-        gr.Info("No messages to submit because the conversation was empty")
+    if dataframe.empty or len(dataframe) < 2:
+        gr.Info("No feedback to submit.")
         return (gr.Dataframe(value=None, interactive=False), [])
 
     dataframe["content"] = dataframe["content"].apply(_process_content)
+    conversation = dataframe.to_dict(orient="records")
+    conversation = conversation[1:]  # remove system message
     conversation_data = {
-        "conversation": dataframe.to_dict(orient="records"),
+        "conversation": conversation,
         "timestamp": datetime.now().isoformat(),
         "session_id": session_id,
         "conversation_id": str(uuid.uuid4()),
+        "language": language,
     }
     save_feedback(input_object=conversation_data)
-    gr.Info(f"Submitted {len(dataframe)} messages to the dataset")
+    gr.Info("Submitted your feedback!")
     return (gr.Dataframe(value=None, interactive=False), [])
 
 
 css = """
-.options {
+.options.svelte-pcaovb {
+    display: none !important;
+}
+.option.svelte-pcaovb {
     display: none !important;
 }
 """
-
 
 with gr.Blocks(css=css) as demo:
     ##############################
@@ -267,10 +303,18 @@ with gr.Blocks(css=css) as demo:
         visible=False,
     )
 
+    language = gr.Dropdown(choices=LANGUAGES, label="Language", interactive=True)
+
     chatbot = gr.Chatbot(
         elem_id="chatbot",
         editable="all",
         bubble_full_width=False,
+        value=[
+            {
+                "role": "system",
+                "content": get_system_message(language.value),
+            }
+        ],
         type="messages",
         feedback_options=["Like", "Dislike"],
     )
@@ -293,6 +337,12 @@ with gr.Blocks(css=css) as demo:
     # Deal with feedback
     ##############################
 
+    language.change(
+        fn=format_system_message,
+        inputs=[language, chatbot],
+        outputs=[chatbot],
+    )
+
     chat_input.submit(
         fn=add_user_message,
         inputs=[chatbot, chat_input],
@@ -310,19 +360,19 @@ with gr.Blocks(css=css) as demo:
 
     chatbot.retry(
         fn=wrangle_retry_data,
-        inputs=[chatbot, dataframe, session_id],
+        inputs=[chatbot, dataframe, session_id, language],
         outputs=[chatbot, dataframe],
     )
 
     chatbot.edit(
         fn=wrangle_edit_data,
-        inputs=[chatbot, dataframe, session_id],
+        inputs=[chatbot, dataframe, session_id, language],
         outputs=[chatbot],
     ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe])
 
     submit_btn.click(
         fn=submit_conversation,
-        inputs=[dataframe, session_id],
+        inputs=[dataframe, session_id, language],
         outputs=[dataframe, chatbot],
     )
     demo.load(
