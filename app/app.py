@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 import gradio as gr
-from feedback import save_feedback
+from feedback import save_feedback, scheduler
 from gradio.components.chatbot import Option
 from huggingface_hub import InferenceClient
 from pandas import DataFrame
@@ -302,8 +302,8 @@ with gr.Blocks(css=css) as demo:
     """)
 
     with gr.Accordion("Explanation") as explanation:
-        gr.Markdown("""
-        FeeL is a collaboration between Hugging Face and MIT. It is a community-driven project to provide a real-time feedback loop for VLMs, where your feedback is continuously used to train the model.
+        gr.Markdown(f"""
+        FeeL is a collaboration between Hugging Face and MIT. It is a community-driven project to provide a real-time feedback loop for VLMs, where your feedback is continuously used to train the model. The [dataset](https://huggingface.co/datasets/{scheduler.repo_id}) and [code](https://github.com/huggingface/feel) are public.
 
         Start by selecting your language, chat with the model with text and images and provide feedback in different ways.
 

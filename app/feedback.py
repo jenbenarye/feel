@@ -6,11 +6,11 @@ from huggingface_hub import CommitScheduler
 
 APP_INSTANCE_ID = str(uuid.uuid4())
 
-feedback_file = Path("user_feedback/") / f"data_{APP_INSTANCE_ID}.json"
+feedback_file = Path("user_feedback/") / f"train-data_{APP_INSTANCE_ID}.json"
 feedback_folder = feedback_file.parent
 
 scheduler = CommitScheduler(
-    repo_id="ohp-test-conversation",
+    repo_id="feel-feedback",
     repo_type="dataset",
     folder_path=feedback_folder,
     path_in_repo="data",
