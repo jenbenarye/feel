@@ -1,15 +1,17 @@
 import os
+import random
 import uuid
 from base64 import b64encode
 from datetime import datetime
 from mimetypes import guess_type
 from pathlib import Path
+from typing import Optional
 
 import gradio as gr
+from feedback import save_feedback
+from gradio.components.chatbot import Option
 from huggingface_hub import InferenceClient
 from pandas import DataFrame
-
-from feedback import save_feedback
 
 client = InferenceClient(
     token=os.getenv("HF_TOKEN"),
@@ -30,7 +32,7 @@ def add_user_message(history, message):
     return history, gr.MultimodalTextbox(value=None, interactive=False)
 
 
-def _format_history_as_messages(history: list):
+def format_history_as_messages(history: list):
     messages = []
     current_role = None
     current_message_content = []
@@ -84,44 +86,150 @@ def _process_content(content) -> str | list[str]:
     return content
 
 
-def respond_system_message(history: list) -> list:  # -> list:
-    """Respond to the user message with a system message"""
-    messages = _format_history_as_messages(history)
+def add_fake_like_data(history: list, session_id: str, liked: bool = False) -> None:
+    data = {
+        "index": len(history) - 1,
+        "value": history[-1],
+        "liked": True,
+    }
+    _, dataframe = wrangle_like_data(
+        gr.LikeData(target=None, data=data), history.copy()
+    )
+    submit_conversation(dataframe, session_id)
+
+
+def respond_system_message(
+    history: list, temperature: Optional[float] = None, seed: Optional[int] = None
+) -> list:  # -> list:
+    """Respond to the user message with a system message
+
+    Return the history with the new message"""
+    messages = format_history_as_messages(history)
     response = client.chat.completions.create(
         messages=messages,
         max_tokens=2000,
         stream=False,
+        seed=seed,
+        temperature=temperature,
     )
     content = response.choices[0].message.content
-    # TODO: Add a response to the user message
-
     message = gr.ChatMessage(role="assistant", content=content)
     history.append(message)
     return history
 
 
+def update_dataframe(dataframe: DataFrame, history: list) -> DataFrame:
+    """Update the dataframe with the new message"""
+    data = {
+        "index": 9999,
+        "value": None,
+        "liked": False,
+    }
+    _, dataframe = wrangle_like_data(
+        gr.LikeData(target=None, data=data), history.copy()
+    )
+    return dataframe
+
+
 def wrangle_like_data(x: gr.LikeData, history) -> DataFrame:
     """Wrangle conversations and liked data into a DataFrame"""
 
-    liked_index = x.index[0]
+    if isinstance(x.index, int):
+        liked_index = x.index
+    else:
+        liked_index = x.index[0]
 
     output_data = []
     for idx, message in enumerate(history):
+        if isinstance(message, gr.ChatMessage):
+            message = message.__dict__
         if idx == liked_index:
             message["metadata"] = {"title": "liked" if x.liked else "disliked"}
+        if not isinstance(message["metadata"], dict):
+            message["metadata"] = message["metadata"].__dict__
         rating = message["metadata"].get("title")
         if rating == "liked":
             message["rating"] = 1
         elif rating == "disliked":
             message["rating"] = -1
         else:
-            message["rating"] = None
+            message["rating"] = 0
+
+        message["chosen"] = ""
+        message["rejected"] = ""
+        if message["options"]:
+            for option in message["options"]:
+                if not isinstance(option, dict):
+                    option = option.__dict__
+                message[option["label"]] = option["value"]
+        else:
+            if message["rating"] == 1:
+                message["chosen"] = message["content"]
+            elif message["rating"] == -1:
+                message["rejected"] = message["content"]
 
         output_data.append(
-            dict([(k, v) for k, v in message.items() if k != "metadata"])
+            dict(
+                [(k, v) for k, v in message.items() if k not in ["metadata", "options"]]
+            )
         )
 
     return history, DataFrame(data=output_data)
+
+
+def wrangle_edit_data(
+    x: gr.EditData, history: list, dataframe: DataFrame, session_id: str
+) -> list:
+    """Edit the conversation and add negative feedback if assistant message is edited, otherwise regenerate the message
+
+    Return the history with the new message"""
+    if isinstance(x.index, int):
+        index = x.index
+    else:
+        index = x.index[0]
+
+    original_message = gr.ChatMessage(
+        role="assistant", content=dataframe.iloc[index]["content"]
+    ).__dict__
+
+    if history[index]["role"] == "user":
+        # Add feedback on original and corrected message
+        add_fake_like_data(history[: index + 2], session_id, liked=True)
+        add_fake_like_data(history[: index + 1] + [original_message], session_id)
+        history = respond_system_message(
+            history[: index + 1],
+            temperature=random.randint(1, 100) / 100,
+            seed=random.randint(0, 1000000),
+        )
+        return history
+    else:
+        # Add feedback on original and corrected message
+        add_fake_like_data(history[: index + 1], session_id, liked=True)
+        add_fake_like_data(history[:index] + [original_message], session_id)
+        history = history[: index + 1]
+        # add chosen and rejected options
+        history[-1]["options"] = [
+            Option(label="chosen", value=x.value),
+            Option(label="rejected", value=original_message["content"]),
+        ]
+        return history
+
+
+def wrangle_retry_data(
+    x: gr.RetryData, history: list, dataframe: DataFrame, session_id: str
+) -> list:
+    """Respond to the user message with a system message and add negative feedback on the original message
+
+    Return the history with the new message"""
+    add_fake_like_data(history, session_id)
+
+    # Return the history without a new message
+    history = respond_system_message(
+        history[:-1],
+        temperature=random.randint(1, 100) / 100,
+        seed=random.randint(0, 1000000),
+    )
+    return history, update_dataframe(dataframe, history)
 
 
 def submit_conversation(dataframe, session_id):
@@ -142,7 +250,14 @@ def submit_conversation(dataframe, session_id):
     return (gr.Dataframe(value=None, interactive=False), [])
 
 
-with gr.Blocks() as demo:
+css = """
+.options {
+    display: none !important;
+}
+"""
+
+
+with gr.Blocks(css=css) as demo:
     ##############################
     # Chatbot
     ##############################
@@ -154,8 +269,10 @@ with gr.Blocks() as demo:
 
     chatbot = gr.Chatbot(
         elem_id="chatbot",
+        editable="all",
         bubble_full_width=False,
         type="messages",
+        feedback_options=["Like", "Dislike"],
     )
 
     chat_input = gr.MultimodalTextbox(
@@ -166,21 +283,23 @@ with gr.Blocks() as demo:
         submit_btn=True,
     )
 
-    chat_msg = chat_input.submit(
-        fn=add_user_message, inputs=[chatbot, chat_input], outputs=[chatbot, chat_input]
-    )
+    dataframe = gr.Dataframe(wrap=True)
 
-    bot_msg = chat_msg.then(
-        respond_system_message, chatbot, chatbot, api_name="bot_response"
+    submit_btn = gr.Button(
+        value="Submit conversation",
     )
-
-    bot_msg.then(lambda: gr.Textbox(interactive=True), None, [chat_input])
 
     ##############################
     # Deal with feedback
     ##############################
 
-    dataframe = gr.DataFrame()
+    chat_input.submit(
+        fn=add_user_message,
+        inputs=[chatbot, chat_input],
+        outputs=[chatbot, chat_input],
+    ).then(respond_system_message, chatbot, chatbot, api_name="bot_response").then(
+        lambda: gr.Textbox(interactive=True), None, [chat_input]
+    ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe])
 
     chatbot.like(
         fn=wrangle_like_data,
@@ -189,9 +308,19 @@ with gr.Blocks() as demo:
         like_user_message=False,
     )
 
-    gr.Button(
-        value="Submit conversation",
-    ).click(
+    chatbot.retry(
+        fn=wrangle_retry_data,
+        inputs=[chatbot, dataframe, session_id],
+        outputs=[chatbot, dataframe],
+    )
+
+    chatbot.edit(
+        fn=wrangle_edit_data,
+        inputs=[chatbot, dataframe, session_id],
+        outputs=[chatbot],
+    ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe])
+
+    submit_btn.click(
         fn=submit_conversation,
         inputs=[dataframe, session_id],
         outputs=[dataframe, chatbot],
