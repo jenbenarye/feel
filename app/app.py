@@ -76,12 +76,11 @@ def format_history_as_messages(history: list):
             current_message_content = []
 
         if isinstance(content, tuple):  # Handle file paths
-            for path in content:
+            for temp_path in content:
                 if space_host := os.getenv("SPACE_HOST"):
-                    url = f"https://{space_host}/gradio_api/file%3D{path}"
+                    url = f"https://{space_host}/gradio_api/file%3D{temp_path}"
                 else:
-                    url = _convert_path_to_data_uri(path)
-                print(url)
+                    url = _convert_path_to_data_uri(temp_path)
                 current_message_content.append(
                     {"type": "image_url", "image_url": {"url": url}}
                 )
