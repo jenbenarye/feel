@@ -78,7 +78,7 @@ def format_history_as_messages(history: list):
         if isinstance(content, tuple):  # Handle file paths
             for path in content:
                 if space_host := os.getenv("SPACE_HOST"):
-                    url = f"https://{space_host}/gradio_api/file%3D/{path}"
+                    url = f"https://{space_host}/gradio_api/file%3D{path}"
                 else:
                     url = _convert_path_to_data_uri(path)
                 print(url)
