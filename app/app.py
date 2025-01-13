@@ -81,6 +81,7 @@ def format_history_as_messages(history: list):
                     url = f"https://{space_host}/gradio_api/file%3D/{path}"
                 else:
                     url = _convert_path_to_data_uri(path)
+                print(url)
                 current_message_content.append(
                     {"type": "image_url", "image_url": {"url": url}}
                 )
