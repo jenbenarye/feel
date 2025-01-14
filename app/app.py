@@ -274,7 +274,6 @@ def submit_conversation(dataframe, session_id, language):
 
     dataframe["content"] = dataframe["content"].apply(_process_content)
     conversation = dataframe.to_dict(orient="records")
-    conversation = conversation[1:]  # remove system message
     conversation_data = {
         "conversation": conversation,
         "timestamp": datetime.now().isoformat(),
