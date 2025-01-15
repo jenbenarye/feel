@@ -13,7 +13,20 @@ from gradio.components.chatbot import Option
 from huggingface_hub import InferenceClient
 from pandas import DataFrame
 
-LANGUAGES: list[str] = ["English", "Spanish", "Hebrew", "Dutch"]
+LANGUAGES: dict[str, str] = {
+    "English": "You are a helpful assistant that speaks English.",
+    "Spanish": "Tu eres un asistente útil que habla español.",
+    "Hebrew": "אתה עוזר טוב שמפגש בעברית.",
+    "Dutch": "Je bent een handige assistent die Nederlands spreekt.",
+    "Italian": "Tu sei un assistente utile che parla italiano.",
+    "French": "Tu es un assistant utile qui parle français.",
+    "German": "Du bist ein hilfreicher Assistent, der Deutsch spricht.",
+    "Portuguese": "Você é um assistente útil que fala português.",
+    "Russian": "Ты полезный помощник, который говорит по-русски.",
+    "Chinese": "你是一个有用的助手，会说中文。",
+    "Japanese": "あなたは役立つ助け役で、日本語を話します。",
+    "Korean": "당신은 유용한 도우미이며 한국어를 말합니다.",
+}
 
 client = InferenceClient(
     token=os.getenv("HF_TOKEN"),
@@ -34,17 +47,6 @@ def add_user_message(history, message):
     return history, gr.MultimodalTextbox(value=None, interactive=False)
 
 
-def get_system_message(language: str) -> str:
-    if language == "English":
-        return "You are a helpful assistant that speaks English."
-    elif language == "Spanish":
-        return "Tu eres un asistente útil que habla español."
-    elif language == "Hebrew":
-        return "אתה עוזר טוב שמפגש בעברית."
-    elif language == "Dutch":
-        return "Je bent een handige assistent die Nederlands spreekt."
-
-
 def format_system_message(language: str, history: list):
     if history:
         if history[0]["role"] == "system":
@@ -52,7 +54,7 @@ def format_system_message(language: str, history: list):
     system_message = [
         {
             "role": "system",
-            "content": get_system_message(language),
+            "content": LANGUAGES[language],
         }
     ]
     history = system_message + history
@@ -315,7 +317,9 @@ with gr.Blocks(css=css) as demo:
 
         Some feedback is automatically submitted allowing you to continue chatting, but you can also submit and reset the conversation by clicking "💾 Submit conversation" (under the chat) or trash the conversation by clicking "🗑️" (upper right corner).
         """)
-        language = gr.Dropdown(choices=LANGUAGES, label="Language", interactive=True)
+        language = gr.Dropdown(
+            choices=list(LANGUAGES.keys()), label="Language", interactive=True
+        )
 
     session_id = gr.Textbox(
         interactive=False,
@@ -330,7 +334,7 @@ with gr.Blocks(css=css) as demo:
         value=[
             {
                 "role": "system",
-                "content": get_system_message(language.value),
+                "content": LANGUAGES[language.value],
             }
         ],
         type="messages",
