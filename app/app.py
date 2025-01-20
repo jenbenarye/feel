@@ -118,6 +118,15 @@ def _process_content(content) -> str | list[str]:
     return content
 
 
+def _process_rating(rating) -> int:
+    if isinstance(rating, str):
+        return 0
+    elif isinstance(rating, int):
+        return rating
+    else:
+        raise ValueError(f"Invalid rating: {rating}")
+
+
 def add_fake_like_data(
     history: list, session_id: str, language: str, liked: bool = False
 ) -> None:
@@ -275,6 +284,7 @@ def submit_conversation(dataframe, session_id, language):
         return (gr.Dataframe(value=None, interactive=False), [])
 
     dataframe["content"] = dataframe["content"].apply(_process_content)
+    dataframe["rating"] = dataframe["rating"].apply(_process_rating)
     conversation = dataframe.to_dict(orient="records")
     conversation_data = {
         "conversation": conversation,
