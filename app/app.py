@@ -466,7 +466,10 @@ with gr.Blocks(css=css) as demo:
         outputs=[chatbot, chat_input],
     ).then(respond, inputs=[chatbot, language], outputs=[chatbot]).then(
         lambda: gr.Textbox(interactive=True), None, [chat_input]
-    ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe])
+    ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe]).then(
+        submit_conversation,
+        inputs=[dataframe, conversation_id, session_id, language],
+    )
 
     chatbot.like(
         fn=wrangle_like_data,
@@ -476,7 +479,6 @@ with gr.Blocks(css=css) as demo:
     ).then(
         submit_conversation,
         inputs=[dataframe, conversation_id, session_id, language],
-        outputs=[dataframe, chatbot],
     )
 
     chatbot.retry(
