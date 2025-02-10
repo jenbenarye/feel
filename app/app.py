@@ -371,7 +371,6 @@ def submit_conversation(dataframe, conversation_id, session_id, language):
         "language": language,
     }
     save_feedback(input_object=conversation_data)
-    gr.Info("Submitted your feedback!")
     return (gr.Dataframe(value=None, interactive=False), [])
 
 
@@ -446,9 +445,7 @@ with gr.Blocks(css=css) as demo:
     with gr.Accordion("Collected feedback", open=False):
         dataframe = gr.Dataframe(wrap=True, label="Collected feedback")
 
-    submit_btn = gr.Button(
-        value="💾 Submit conversation",
-    )
+    submit_btn = gr.Button(value="💾 Submit conversation", visible=False)
 
     ##############################
     # Deal with feedback
