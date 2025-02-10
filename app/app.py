@@ -509,5 +509,3 @@ with gr.Blocks(css=css) as demo:
     )
 
 demo.launch()
-
-# /private/var/folders/9t/msy700h16jz3q35qvg4z1ln40000gn/T/gradio/a5013b9763ad9f2192254540fee226539fbcd1382cbc2317b916aef469bb01b9/Screenshot 2025-01-13 at 08.02.26.png
