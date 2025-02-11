@@ -469,12 +469,6 @@ with gr.Blocks(css=css) as demo:
         outputs=[dataframe, chatbot],
     )
 
-    chat_input.clear(
-        fn=lambda: gr.Textbox(interactive=True),
-        inputs=[chat_input],
-        outputs=[chat_input],  # Reset chat input
-    )
-
     chatbot.like(
         fn=wrangle_like_data,
         inputs=[chatbot],
