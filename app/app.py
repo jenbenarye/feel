@@ -190,7 +190,7 @@ def respond(
     messages = format_history_as_messages(history)
     response = LANGUAGES_TO_CLIENT[language].chat.completions.create(
         messages=messages,
-        max_tokens=4000,
+        max_tokens=2000,
         stream=False,
         seed=seed,
         temperature=temperature,
@@ -466,6 +466,13 @@ with gr.Blocks(css=css) as demo:
     ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe]).then(
         submit_conversation,
         inputs=[dataframe, conversation_id, session_id, language],
+        outputs=[dataframe, chatbot],
+    )
+
+    chat_input.clear(
+        fn=lambda: gr.Textbox(interactive=True),
+        inputs=[chat_input],
+        outputs=[chat_input],  # Reset chat input
     )
 
     chatbot.like(
@@ -476,6 +483,7 @@ with gr.Blocks(css=css) as demo:
     ).then(
         submit_conversation,
         inputs=[dataframe, conversation_id, session_id, language],
+        outputs=[dataframe, chatbot],
     )
 
     chatbot.retry(
