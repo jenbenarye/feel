@@ -3,57 +3,96 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 import json
 from ipdb import set_trace as st
+import tiktoken
+from transformers import AutoTokenizer
 
+def count_tokens(text: str, model_name: str) -> int:
+    """Count tokens in text using model's tokenizer"""
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    return len(tokenizer.encode(text))
 
+def format_conversation(messages: list, model_name: str) -> str:
+    """Format messages using model's chat template"""
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    return tokenizer.apply_chat_template(messages, tokenize=False)
 
-def process_feel_dataset():
+def transform_conversation(
+    entry: dict,
+    model_name: str,
+    max_history_turns: int = 10,
+    max_history_tokens: int = 4000
+) -> list:
+    """Transform conversation into KTO format with history"""
+    data_points = []
+    conversation = entry["conversation"]
+
+    for i, message in enumerate(conversation):
+        # Only process assistant messages with ratings
+        if message["role"] != "assistant" or message["rating"] not in [1, -1]:
+            continue
+
+        # Get previous messages up to limits
+        history = []
+        tokens = 0
+        turns = 0
+
+        # Start from i-1 instead of going through all previous messages
+        for prev in reversed(conversation[max(0, i-1):i]):
+            if turns >= max_history_turns:
+                break
+
+            history.insert(0, prev)
+            formatted = format_conversation(history, model_name)
+            tokens = count_tokens(formatted, model_name)
+
+            if tokens > max_history_tokens:
+                history.pop(0)
+                break
+
+            turns += 1
+
+        # Format prompt with just the immediate previous message
+        prompt = format_conversation([conversation[i-1]], model_name) if i > 0 else ""
+
+        data_points.append({
+            "prompt": prompt.strip(),
+            "completion": message["content"].strip(),
+            "label": message["rating"] == 1,
+            "timestamp": entry["timestamp"],
+            "session_id": entry["session_id"],
+            "conversation_id": entry["conversation_id"]
+        })
+
+    return data_points
+
+def process_feel_dataset(
+    model_name: str = "HuggingFaceH4/zephyr-7b-beta",
+    max_history_turns: int = 10,
+    max_history_tokens: int = 4000
+):
     """
     Processes the feel dataset into a format suitable for KTO training using TRL.
 
     Args:
-        data (list): A list of dictionaries containing conversation data.
+        model_name: Name of the model to format for
+        max_history_turns: Maximum number of previous turns to include in history
+        max_history_tokens: Maximum number of tokens allowed in history
 
     Returns:
-        dict: A dictionary containing the 'train' and 'test' splits of the dataset in KTO format, as Hugging Face Dataset objects.
+        dict: A dictionary containing the 'train' and 'test' splits of the dataset in KTO format
     """
-
-    # Load feel dataset
-    # Load the JSON file
-    file_path = "../data/example_data.json"
-    with open(file_path, "r") as file:
-        feel_dataset = json.load(file)
-
-
+    # Load feel dataset from HuggingFace
+    feel_dataset = load_dataset("feel-fl/feel-feedback")["train"]
     kto_data = []
-
-    # Function to transform a single conversation into KTO format
-    def transform_conversation(entry):
-        conversation = entry["conversation"]
-        data_points = []
-        user_timestamp = None
-
-        for i in range(len(conversation)):
-            message = conversation[i]
-            if message["role"] == "user":
-                user_timestamp = entry["timestamp"]
-            if (
-                message["role"] == "assistant" and
-                message["rating"] in [1, -1]  # Only process feedback with positive or negative ratings
-            ):
-                user_content = conversation[i - 1]["content"] if i > 0 and conversation[i - 1]["role"] == "user" else ""
-                data_points.append({
-                    "prompt": user_content.strip(),
-                    "completion": message["content"].strip(),
-                    "label": message["rating"] == 1,  # True for positive feedback, False for negative (KTO Trainer format)
-                    "timestamp": user_timestamp,
-                    "session_id": entry["session_id"],
-                    "conversation_id": entry["conversation_id"]
-                })
-        return data_points
 
     # Process all conversations in the dataset
     for entry in feel_dataset:
-        kto_data.extend(transform_conversation(entry))
+        kto_data.extend(transform_conversation(
+            entry,
+            model_name,
+            max_history_turns,
+            max_history_tokens
+        ))
 
     # Convert to DataFrame
     kto_df = pd.DataFrame(kto_data)
@@ -71,66 +110,63 @@ def process_feel_dataset():
 
     return {"train": train_dataset, "test": test_dataset}
 
-
-
-
-# def process_dataset_ultrafeedback():
-#     """
-#     Processes the 'train_prefs' and 'test_prefs' splits of the 'HuggingFaceH4/ultrafeedback_binarized' dataset
-#     into a unified format for preference modeling.
-
-#     Returns:
-#         dict: A dictionary containing the unified 'train' and 'test' splits of the dataset in the KTO format.
-#               Each split is a Hugging Face Dataset object.
-#     """
-#     # Load the relevant splits of the dataset
-#     dataset_name = "HuggingFaceH4/ultrafeedback_binarized"
-#     train_prefs = load_dataset(dataset_name, split="train_prefs")
-#     test_prefs = load_dataset(dataset_name, split="test_prefs")
-
-#     # Function to transform a single example into the desired schema
-#     def transform_data(example):
-#         data_points = []
-#         # Chosen completion
-#         chosen_completion = example["chosen"][1]["content"]
-#         if chosen_completion.strip():  # Check for non-empty completions
-#             data_points.append({
-#                 "prompt": example["prompt"],
-#                 "completion": chosen_completion.strip(),
-#                 "label": True
-#             })
-#         # Rejected completion
-#         rejected_completion = example["rejected"][1]["content"]
-#         if rejected_completion.strip():  # Check for non-empty completions
-#             data_points.append({
-#                 "prompt": example["prompt"],
-#                 "completion": rejected_completion.strip(),
-#                 "label": False
-#             })
-#         return data_points
-
-#     # Process train and test splits
-#     train_data = []
-#     test_data = []
-
-#     for example in train_prefs:
-#         train_data.extend(transform_data(example))
-
-#     for example in test_prefs:
-#         test_data.extend(transform_data(example))
-
-#     # Convert unified data to DataFrames
-#     train_df = pd.DataFrame(train_data)
-#     test_df = pd.DataFrame(test_data)
-
-
-#     # Convert to Hugging Face Dataset
-#     unified_train = Dataset.from_pandas(train_df)
-#     unified_test = Dataset.from_pandas(test_df)
-
-#     return {"train": unified_train, "test": unified_test}
-
-
 if __name__ == "__main__":
-    kto_dataset = process_feel_dataset()
-    st()
+    # Process the dataset
+    datasets = process_feel_dataset()
+
+    # Print basic statistics
+    print("\nDataset Statistics:")
+    print(f"Train set size: {len(datasets['train'])}")
+    print(f"Test set size: {len(datasets['test'])}")
+
+    # Print distribution of positive/negative labels
+    train_labels = datasets['train']['label']
+    test_labels = datasets['test']['label']
+
+    print("\nLabel Distribution:")
+    print("Train set:")
+    print(f"Positive feedback: {sum(train_labels)}")
+    print(f"Negative feedback: {len(train_labels) - sum(train_labels)}")
+    print(f"Positive ratio: {sum(train_labels)/len(train_labels):.2%}")
+
+    print("\nTest set:")
+    print(f"Positive feedback: {sum(test_labels)}")
+    print(f"Negative feedback: {len(test_labels) - sum(test_labels)}")
+    print(f"Positive ratio: {sum(test_labels)/len(test_labels):.2%}")
+
+    # Load original FEEL dataset
+    feel_dataset = load_dataset("feel-fl/feel-feedback", split="train")
+
+    # Print one original conversation
+    print("\nOriginal conversation from FEEL dataset:")
+    print(json.dumps(feel_dataset[0], indent=2))
+
+    # Print sample entries from processed dataset
+    print("\nSample entries from processed KTO dataset:")
+    print("\n" + "="*80 + "\nTRAIN SET SAMPLES\n" + "="*80)
+
+    # for i, example in enumerate(datasets['train'].select(range(min(3, len(datasets['train']))))):
+    #     print(f"\nEntry #{i+1}:")
+    #     print("-" * 40)
+    #     for field, value in example.items():
+    #         print(f"\n{field}:")
+    #         if isinstance(value, str):
+    #             # Print strings with line breaks for better readability
+    #             print(f"{value}")
+    #         else:
+    #             print(f"{value}")
+    #     print("\n" + "-"*80)
+
+    # print("\n" + "="*80 + "\nTEST SET SAMPLES\n" + "="*80)
+
+    # for i, example in enumerate(datasets['test'].select(range(min(3, len(datasets['test']))))):
+    #     print(f"\nEntry #{i+1}:")
+    #     print("-" * 40)
+    #     for field, value in example.items():
+    #         print(f"\n{field}:")
+    #         if isinstance(value, str):
+    #             # Print strings with line breaks for better readability
+    #             print(f"{value}")
+    #         else:
+    #             print(f"{value}")
+    #     print("\n" + "-"*80)
