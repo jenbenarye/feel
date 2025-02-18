@@ -4,7 +4,21 @@ from sklearn.model_selection import train_test_split
 import json
 from ipdb import set_trace as st
 from transformers import AutoTokenizer
+from enum import Enum
 
+class SupportedLanguages(str, Enum):
+    """Enumeration of supported languages"""
+    ENGLISH = "English"
+    DUTCH = "Dutch"
+    ITALIAN = "Italian"
+    SPANISH = "Spanish"
+    FRENCH = "French"
+    GERMAN = "German"
+    PORTUGUESE = "Portuguese"
+    RUSSIAN = "Russian"
+    CHINESE = "Chinese"
+    JAPANESE = "Japanese"
+    KOREAN = "Korean"
 
 def transform_conversation(
     entry: dict,
@@ -72,12 +86,14 @@ def transform_conversation(
             "label": message["rating"] == 1,
             "timestamp": entry["timestamp"],
             "session_id": entry["session_id"],
-            "conversation_id": entry["conversation_id"]
+            "conversation_id": entry["conversation_id"],
+            "language": entry["language"]
         })
 
     return data_points
 
 def process_feel_dataset(
+    language: str,
     model_name: str = "CohereForAI/aya-expanse-8b",
     max_history_turns: int = 10,
     max_history_tokens: int = 4000
@@ -86,18 +102,43 @@ def process_feel_dataset(
     Processes the feel dataset into a format suitable for KTO training using TRL.
 
     Args:
+        language: Language to filter the dataset for (must be one of SupportedLanguages)
         model_name: Name of the model to format for
         max_history_turns: Maximum number of previous turns to include in history
         max_history_tokens: Maximum number of tokens allowed in history
 
     Returns:
         dict: A dictionary containing the 'train' and 'test' splits of the dataset in KTO format
+
+    Raises:
+        ValueError: If language is not provided or not in SupportedLanguages
     """
+    # Validate language
+    if not language:
+        raise ValueError("Language parameter is required")
+
+    try:
+        # Validate that it's a supported language
+        SupportedLanguages(language)
+    except ValueError:
+        supported_langs = "\n- ".join([lang.value for lang in SupportedLanguages])
+        raise ValueError(
+            f"Invalid language: '{language}'\n"
+            f"Supported languages are:\n- {supported_langs}"
+        )
+
     # Load feel dataset from HuggingFace
     feel_dataset = load_dataset("feel-fl/feel-feedback")["train"]
+
+    # Filter dataset by language
+    feel_dataset = feel_dataset.filter(lambda x: x["language"] == language)
+
+    if len(feel_dataset) == 0:
+        raise ValueError(f"No data found for language: {language}")
+
     kto_data = []
 
-    # Process all conversations in the dataset
+    # Process all conversations in the filtered dataset
     for entry in feel_dataset:
         kto_data.extend(transform_conversation(
             entry,
@@ -105,6 +146,9 @@ def process_feel_dataset(
             max_history_turns,
             max_history_tokens
         ))
+
+    if len(kto_data) == 0:
+        raise ValueError(f"No valid training examples found for language: {language}")
 
     # Convert to DataFrame
     kto_df = pd.DataFrame(kto_data)
@@ -120,16 +164,15 @@ def process_feel_dataset(
     train_dataset = Dataset.from_pandas(train_df)
     test_dataset = Dataset.from_pandas(test_df)
 
+    print(f"Processed {len(kto_data)} examples for language: {language}")
+    print(f"Train set size: {len(train_dataset)}")
+    print(f"Test set size: {len(test_dataset)}")
+
     return {"train": train_dataset, "test": test_dataset}
 
 if __name__ == "__main__":
     # Process the dataset
-    datasets = process_feel_dataset()
-
-    # Print basic statistics
-    print("\nDataset Statistics:")
-    print(f"Train set size: {len(datasets['train'])}")
-    print(f"Test set size: {len(datasets['test'])}")
+    datasets = process_feel_dataset("English")
 
     # Print distribution of positive/negative labels
     train_labels = datasets['train']['label']
