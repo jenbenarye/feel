@@ -4,9 +4,12 @@ from dataclasses import dataclass
 from accelerate import PartialState
 from transformers import AutoModelForCausalLM, AutoTokenizer, HfArgumentParser
 from trl import KTOConfig, KTOTrainer, ModelConfig, get_peft_config, maybe_unpair_preference_dataset, setup_chat_format
-from kto_dataset_processor import process_feel_dataset
+from kto_dataset_processor import process_feel_dataset, SupportedLanguages
 from datetime import datetime
 import wandb
+from enum import Enum
+from typing import Optional
+
 
 # PEFT library: attach and load adapters
 from peft import get_peft_model, PeftModel
@@ -15,15 +18,28 @@ from peft import get_peft_model, PeftModel
 #  CONFIGURATION
 ####################################
 
+
 @dataclass
 class ScriptArguments:
     """
     Configuration for the script.
     """
-    process_dataset_func: callable = process_feel_dataset  # Function to process dataset
-    checkpoint_path: str = None  # Checkpoint path if needed
-    push_to_hub: bool = False  # Whether to push the adapter to the HF Hub after training
-    language: str = "en"  # Language identifier (e.g., "en", "fr", etc.)
+    process_dataset_func: callable = process_feel_dataset
+    checkpoint_path: str = None
+    push_to_hub: bool = True
+    language: str = "English"  # Default to English
+
+    def __post_init__(self):
+        """Validate the language after initialization"""
+        try:
+            # This will raise ValueError if language is not in the enum
+            SupportedLanguages(self.language)
+        except ValueError:
+            supported_langs = "\n- ".join([lang.value for lang in SupportedLanguages])
+            raise ValueError(
+                f"Invalid language: '{self.language}'\n"
+                f"Supported languages are:\n- {supported_langs}"
+            )
 
 @dataclass
 class ModelArguments(ModelConfig):
@@ -121,7 +137,7 @@ def main():
     # Data Preparation and Training
     # -----------------------------
     print("Processing dataset...")
-    dataset = script_args.process_dataset_func()
+    dataset = script_args.process_dataset_func(script_args.language)
     print("Dataset processed.")
 
     print("Initializing trainer...")
@@ -173,8 +189,10 @@ def main():
     print(f"Adapter for language '{script_args.language}' saved to: {adapter_dir}")
 
     if script_args.push_to_hub:
-        print("Pushing adapter to Hugging Face Hub...")
-        model.push_to_hub(repo_id=f"your_hf_org/{script_args.language}-adapter")
+        # Using a consistent naming pattern that links to the FEEL project
+        repo_id = f"feel-fl/kto-lora-adapter-{script_args.language}"
+        print(f"Pushing adapter to Hugging Face Hub at {repo_id}...")
+        model.push_to_hub(repo_id=repo_id)
 
     print("Process completed.")
 
