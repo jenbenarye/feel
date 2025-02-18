@@ -3,18 +3,8 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 import json
 from ipdb import set_trace as st
-import tiktoken
 from transformers import AutoTokenizer
 
-def count_tokens(text: str, model_name: str) -> int:
-    """Count tokens in text using model's tokenizer"""
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    return len(tokenizer.encode(text))
-
-def format_conversation(messages: list, model_name: str) -> str:
-    """Format messages using model's chat template"""
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    return tokenizer.apply_chat_template(messages, tokenize=False)
 
 def transform_conversation(
     entry: dict,
@@ -25,37 +15,59 @@ def transform_conversation(
     """Transform conversation into KTO format with history"""
     data_points = []
     conversation = entry["conversation"]
+    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
     for i, message in enumerate(conversation):
-        # Only process assistant messages with ratings
+        # Only create data points for assistant messages that have ratings
         if message["role"] != "assistant" or message["rating"] not in [1, -1]:
             continue
 
         # Get previous messages up to limits
-        history = []
+        formatted_history = []
+        formatted_prompt = ""
         tokens = 0
-        turns = 0
+        pairs = 0  # Count complete user/assistant pairs
 
-        # Start from i-1 instead of going through all previous messages
-        for prev in reversed(conversation[max(0, i-1):i]):
-            if turns >= max_history_turns:
-                break
+        # Start from the current message and work backwards
+        current_idx = i - 1
+        while current_idx >= 0 and pairs < max_history_turns:
+            # We need both user and assistant messages to form a pair
+            if current_idx > 0 and conversation[current_idx]["role"] == "user" and conversation[current_idx-1]["role"] == "assistant":
+                # Add the pair to history
+                formatted_history.insert(0, conversation[current_idx-1])  # assistant
+                formatted_history.insert(1, conversation[current_idx])    # user
 
-            history.insert(0, prev)
-            formatted = format_conversation(history, model_name)
-            tokens = count_tokens(formatted, model_name)
+                # Check token limit
+                try:
+                    current_formatted = tokenizer.apply_chat_template(formatted_history, tokenize=False)
+                    current_tokens = len(tokenizer.encode(current_formatted))
 
-            if tokens > max_history_tokens:
-                history.pop(0)
-                break
+                    if current_tokens > max_history_tokens:
+                        formatted_history = formatted_history[2:]  # Remove the oldest pair
+                        break
 
-            turns += 1
+                    formatted_prompt = current_formatted
+                    tokens = current_tokens
+                    pairs += 1
+                    current_idx -= 2
+                except Exception:
+                    # If template application fails, remove the last added pair
+                    formatted_history = formatted_history[2:]
+                    break
+            else:
+                current_idx -= 1
 
-        # Format prompt with just the immediate previous message
-        prompt = format_conversation([conversation[i-1]], model_name) if i > 0 else ""
+        # Add the final user message that prompted the rated response
+        if i > 0 and conversation[i-1]["role"] == "user":
+            last_history = formatted_history + [conversation[i-1]]
+            try:
+                formatted_prompt = tokenizer.apply_chat_template(last_history, tokenize=False)
+            except Exception:
+                # If template application fails, use the previous valid prompt
+                pass
 
         data_points.append({
-            "prompt": prompt.strip(),
+            "prompt": formatted_prompt.strip(),
             "completion": message["content"].strip(),
             "label": message["rating"] == 1,
             "timestamp": entry["timestamp"],
@@ -66,7 +78,7 @@ def transform_conversation(
     return data_points
 
 def process_feel_dataset(
-    model_name: str = "HuggingFaceH4/zephyr-7b-beta",
+    model_name: str = "CohereForAI/aya-expanse-8b",
     max_history_turns: int = 10,
     max_history_tokens: int = 4000
 ):
@@ -145,28 +157,11 @@ if __name__ == "__main__":
     print("\nSample entries from processed KTO dataset:")
     print("\n" + "="*80 + "\nTRAIN SET SAMPLES\n" + "="*80)
 
-    # for i, example in enumerate(datasets['train'].select(range(min(3, len(datasets['train']))))):
-    #     print(f"\nEntry #{i+1}:")
-    #     print("-" * 40)
-    #     for field, value in example.items():
-    #         print(f"\n{field}:")
-    #         if isinstance(value, str):
-    #             # Print strings with line breaks for better readability
-    #             print(f"{value}")
-    #         else:
-    #             print(f"{value}")
-    #     print("\n" + "-"*80)
+    # Export datasets to CSV
+    train_df = datasets['train'].to_pandas()
+    test_df = datasets['test'].to_pandas()
 
-    # print("\n" + "="*80 + "\nTEST SET SAMPLES\n" + "="*80)
+    train_df.to_csv('kto_train_dataset.csv', index=False)
+    test_df.to_csv('kto_test_dataset.csv', index=False)
 
-    # for i, example in enumerate(datasets['test'].select(range(min(3, len(datasets['test']))))):
-    #     print(f"\nEntry #{i+1}:")
-    #     print("-" * 40)
-    #     for field, value in example.items():
-    #         print(f"\n{field}:")
-    #         if isinstance(value, str):
-    #             # Print strings with line breaks for better readability
-    #             print(f"{value}")
-    #         else:
-    #             print(f"{value}")
-    #     print("\n" + "-"*80)
+    print("\nDatasets exported to 'kto_train_dataset.csv' and 'kto_test_dataset.csv'")
