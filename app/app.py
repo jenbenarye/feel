@@ -227,7 +227,11 @@ def wrangle_like_data(x: gr.LikeData, history) -> DataFrame:
         if isinstance(message, gr.ChatMessage):
             message = message.__dict__
         if idx == liked_index:
-            message["metadata"] = {"title": "liked" if x.liked else "disliked"}
+            if x.liked is True:
+                message["metadata"] = {"title": "liked"}
+            elif x.liked is False:
+                message["metadata"] = {"title": "disliked"}
+
         if not isinstance(message["metadata"], dict):
             message["metadata"] = message["metadata"].__dict__
         rating = message["metadata"].get("title")
