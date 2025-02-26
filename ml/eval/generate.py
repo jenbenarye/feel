@@ -141,7 +141,7 @@ def save_results(results, output_file):
 #  MAIN SCRIPT
 ####################################
 
-def main():
+def generate_files():
     # Load model and tokenizer
     print("Loading kto fine-tuned model...")
     kto_model, kto_tokenizer = load_model_and_tokenizer(script_args.kto_model_path, use_auth_token=True)
@@ -166,4 +166,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    generate_files()
