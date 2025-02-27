@@ -240,22 +240,13 @@ def main():
     # Save metadata
     metadata = AdapterMetadata(
         training_timestamp=training_timestamp,
-        dataset_entries=[entry["id"] for entry in dataset],
-        training_params={
-            "max_weight": script_args.max_weight,
-            "min_weight": script_args.min_weight,
-            "decay_factor": script_args.decay_factor,
-            "training_mode": script_args.training_mode
-        },
         model_name=model_args.model_name,
         language=script_args.language,
-        version=training_timestamp
     )
     metadata.save(adapter_path / "metadata.json")
 
     if script_args.push_to_hub:
-        # Using a consistent naming pattern that links to the FEEL project
-        repo_id = f"feel-fl/kto-lora-adapter-{script_args.language}"
+        repo_id = f"feel-fl/adapters/{model_args.model_name.replace('/', '_')}/{script_args.language}"
         print(f"Pushing adapter to Hugging Face Hub at {repo_id}...")
         model.push_to_hub(repo_id=repo_id)
 
