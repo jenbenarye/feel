@@ -126,7 +126,7 @@ def main():
 
     if os.path.isdir(adapter_dir):
         # If an adapter for this language already exists, load it into the base model.
-        model = PeftModel.from_pretrained(model, adapter_dir)
+        model = PeftModel.from_pretrained(model, adapter_dir, is_trainable=True)
         print(f"Loaded existing adapter for language '{script_args.language}' from {adapter_dir}.")
     else:
         # Otherwise, initialize a new LoRA adapter.
@@ -184,9 +184,12 @@ def main():
     # Adapter Saving
     # -----------------------------
     print("Saving adapter...")
-    os.makedirs(adapter_dir, exist_ok=True)
-    model.save_pretrained(adapter_dir)
-    print(f"Adapter for language '{script_args.language}' saved to: {adapter_dir}")
+    # Add timestamp to adapter directory
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    new_adapter_dir = os.path.join(adapter_dir, f"version_{timestamp}")
+    os.makedirs(new_adapter_dir, exist_ok=True)
+    model.save_pretrained(new_adapter_dir)
+    print(f"Adapter for language '{script_args.language}' saved to: {new_adapter_dir}")
 
     if script_args.push_to_hub:
         # Using a consistent naming pattern that links to the FEEL project
