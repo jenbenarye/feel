@@ -9,6 +9,7 @@ from datetime import datetime
 import wandb
 from enum import Enum
 from typing import Optional
+from pathlib import Path
 
 
 # PEFT library: attach and load adapters
@@ -104,6 +105,48 @@ def load_model_and_tokenizer(model_args):
 
     return model, tokenizer
 
+def get_adapter_path(model_name: str, language: str, timestamp: str = None) -> Path:
+    """
+    Generate standardized adapter path.
+    If timestamp is None, returns the base language directory.
+    Otherwise, returns specific adapter version path.
+
+    Format: adapters/{model_name}/{language}/version_{timestamp}
+    """
+    # Clean model name (remove slashes, etc.)
+    clean_model_name = model_name.replace('/', '_')
+
+    base_path = Path("adapters") / clean_model_name / language
+    if timestamp:
+        return base_path / f"version_{timestamp}"
+    return base_path
+
+def load_latest_adapter(model, model_name: str, language: str) -> tuple[PeftModel, str]:
+    """
+    Load the most recent adapter for given model and language.
+    Returns: (loaded_model, timestamp of loaded adapter)
+    """
+    adapter_base = get_adapter_path(model_name, language)
+
+    if not adapter_base.exists():
+        return None, None
+
+    # Get all version directories and sort by timestamp
+    versions = sorted(
+        [d for d in adapter_base.glob("version_*")],
+        key=lambda x: x.name,
+        reverse=True
+    )
+
+    if not versions:
+        return None, None
+
+    latest_version = versions[0]
+    timestamp = latest_version.name.replace("version_", "")
+
+    model = PeftModel.from_pretrained(model, latest_version, is_trainable=True)
+    return model, timestamp
+
 ####################################
 #  MAIN LOGIC
 ####################################
@@ -112,26 +155,29 @@ def main():
     # Initialize wandb for logging
     wandb.init(project="kto")
 
+    # Get timestamp at start of training
+    training_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
     print("Loading base model and tokenizer...")
     model, tokenizer = load_model_and_tokenizer(model_args)
     ref_model, _ = load_model_and_tokenizer(model_args)
     print("Models and tokenizer loaded.")
 
-    # -----------------------------
-    # Adapter Loading or Initialization
-    # -----------------------------
-    # Configure the PEFT / LoRA adapter settings
-    peft_config = get_peft_config(model_args)
-    adapter_dir = os.path.join("adapters", script_args.language)
+    # Load existing adapter or create new one
+    loaded_model, previous_timestamp = load_latest_adapter(
+        model,
+        model_args.model_name,
+        script_args.language
+    )
 
-    if os.path.isdir(adapter_dir):
-        # If an adapter for this language already exists, load it into the base model.
-        model = PeftModel.from_pretrained(model, adapter_dir, is_trainable=True)
-        print(f"Loaded existing adapter for language '{script_args.language}' from {adapter_dir}.")
+    if loaded_model is not None:
+        model = loaded_model
+        print(f"Loaded existing adapter trained at {previous_timestamp}")
     else:
-        # Otherwise, initialize a new LoRA adapter.
+        # Initialize new LoRA adapter
+        peft_config = get_peft_config(model_args)
         model = get_peft_model(model, peft_config)
-        print(f"No adapter found for language '{script_args.language}'. Initialized new adapter.")
+        print("Initialized new adapter")
 
     # -----------------------------
     # Data Preparation and Training
@@ -180,16 +226,32 @@ def main():
         "step": metrics.get("step")
     })
 
-    # -----------------------------
-    # Adapter Saving
-    # -----------------------------
-    print("Saving adapter...")
-    # Add timestamp to adapter directory
-    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    new_adapter_dir = os.path.join(adapter_dir, f"version_{timestamp}")
-    os.makedirs(new_adapter_dir, exist_ok=True)
-    model.save_pretrained(new_adapter_dir)
-    print(f"Adapter for language '{script_args.language}' saved to: {new_adapter_dir}")
+    # Save the adapter
+    adapter_path = get_adapter_path(
+        model_args.model_name,
+        script_args.language,
+        training_timestamp
+    )
+    adapter_path.parent.mkdir(parents=True, exist_ok=True)
+
+    print(f"Saving adapter to: {adapter_path}")
+    model.save_pretrained(adapter_path)
+
+    # Save metadata
+    metadata = AdapterMetadata(
+        training_timestamp=training_timestamp,
+        dataset_entries=[entry["id"] for entry in dataset],
+        training_params={
+            "max_weight": script_args.max_weight,
+            "min_weight": script_args.min_weight,
+            "decay_factor": script_args.decay_factor,
+            "training_mode": script_args.training_mode
+        },
+        model_name=model_args.model_name,
+        language=script_args.language,
+        version=training_timestamp
+    )
+    metadata.save(adapter_path / "metadata.json")
 
     if script_args.push_to_hub:
         # Using a consistent naming pattern that links to the FEEL project
