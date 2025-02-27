@@ -46,10 +46,10 @@ def transform_conversation(
         current_idx = i - 1
         while current_idx >= 0 and pairs < max_history_turns:
             # We need both user and assistant messages to form a pair
-            if current_idx > 0 and conversation[current_idx]["role"] == "user" and conversation[current_idx-1]["role"] == "assistant":
+            if current_idx > 0 and conversation[current_idx]["role"] == "assistant" and conversation[current_idx-1]["role"] == "user":
                 # Add the pair to history
-                formatted_history.insert(0, conversation[current_idx-1])  # assistant
-                formatted_history.insert(1, conversation[current_idx])    # user
+                formatted_history.insert(0, conversation[current_idx-1])  # user
+                formatted_history.insert(1, conversation[current_idx])    # assistant
 
                 # Check token limit
                 try:
