@@ -34,6 +34,7 @@ LANGUAGES: dict[str, str] = {
 
 BASE_MODEL = os.getenv("MODEL", "meta-llama/Llama-3.2-11B-Vision-Instruct")
 ZERO_GPU = bool(os.getenv("ZERO_GPU", False)) or True if str(os.getenv("ZERO_GPU")).lower() == "true" else False
+TEXT_ONLY = bool(os.getenv("TEXT_ONLY", False)) or True if str(os.getenv("TEXT_ONLY")).lower() == "true" else False
 
 def create_inference_client(
     model: Optional[str] = None, base_url: Optional[str] = None
@@ -48,7 +49,7 @@ def create_inference_client(
     """
     if ZERO_GPU:
         tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
-        model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, load_in_4bit=True)
+        model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, load_in_8bit=True)
         return pipeline("text-generation", model=model, tokenizer=tokenizer)
     else:
         return InferenceClient(
@@ -90,6 +91,16 @@ def format_history_as_messages(history: list):
     messages = []
     current_role = None
     current_message_content = []
+
+    if TEXT_ONLY:
+        for entry in history:
+            messages.append(
+                {
+                    "role": entry["role"],
+                    "content": entry["content"]
+                }
+            )
+        return messages
 
     for entry in history:
         content = entry["content"]
