@@ -7,6 +7,7 @@ from mimetypes import guess_type
 from pathlib import Path
 from typing import Optional
 
+import spaces
 import gradio as gr
 from feedback import save_feedback, scheduler
 from gradio.components.chatbot import Option
@@ -32,7 +33,7 @@ LANGUAGES: dict[str, str] = {
 
 
 BASE_MODEL = os.getenv("MODEL", "meta-llama/Llama-3.2-11B-Vision-Instruct")
-ZERO_GPU = os.getenv("ZERO_GPU", False)
+ZERO_GPU = os.getenv("  ", False)
 
 def create_inference_client(
     model: Optional[str] = None, base_url: Optional[str] = None
@@ -183,6 +184,11 @@ def add_fake_like_data(
         language=language,
     )
 
+@spaces.GPU
+def call_pipeline(messages: list):
+    response = LANGUAGES_TO_CLIENT[language](messages)
+    content = response[0]["generated_text"][-1]["content"]
+    return content
 
 def respond(
     history: list,
@@ -195,8 +201,7 @@ def respond(
     Return the history with the new message"""
     messages = format_history_as_messages(history)
     if ZERO_GPU:
-        response = LANGUAGES_TO_CLIENT[language](messages)
-        content = response[0]["generated_text"][-1]["content"]
+        content = call_pipeline(messages)
     else:
         response = LANGUAGES_TO_CLIENT[language].chat.completions.create(
             messages=messages,
