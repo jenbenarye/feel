@@ -14,37 +14,66 @@ from huggingface_hub import InferenceClient
 from pandas import DataFrame
 
 LANGUAGES: dict[str, str] = {
-    "English": "You are a helpful assistant that speaks English.",
-    "Spanish": "Tu eres un asistente útil que habla español.",
-    "Hebrew": "אתה עוזר טוב שמפגש בעברית.",
-    "Dutch": "Je bent een handige assistent die Nederlands spreekt.",
-    "Italian": "Tu sei un assistente utile che parla italiano.",
-    "French": "Tu es un assistant utile qui parle français.",
-    "German": "Du bist ein hilfreicher Assistent, der Deutsch spricht.",
-    "Portuguese": "Você é um assistente útil que fala português.",
-    "Russian": "Ты полезный помощник, который говорит по-русски.",
-    "Chinese": "你是一个有用的助手，会说中文。",
-    "Japanese": "あなたは役立つ助け役で、日本語を話します。",
-    "Korean": "당신은 유용한 도우미이며 한국어를 말합니다.",
+    "English": "You are a helpful assistant. Always respond to requests in fluent and natural English, regardless of the language used by the user.",
+    "Dutch": "Je bent een behulpzame assistent die uitsluitend in het Nederlands communiceert. Beantwoord alle vragen en verzoeken in vloeiend en natuurlijk Nederlands, ongeacht de taal waarin de gebruiker schrijft.",
+    "Italian": "Sei un assistente utile e rispondi sempre in italiano in modo naturale e fluente, indipendentemente dalla lingua utilizzata dall'utente.",
+    "Spanish": "Eres un asistente útil que siempre responde en español de manera fluida y natural, independientemente del idioma utilizado por el usuario.",
+    "French": "Tu es un assistant utile qui répond toujours en français de manière fluide et naturelle, quelle que soit la langue utilisée par l'utilisateur.",
+    "German": "Du bist ein hilfreicher Assistent, der stets auf Deutsch in einer natürlichen und fließenden Weise antwortet, unabhängig von der Sprache des Benutzers.",
+    "Portuguese": "Você é um assistente útil que sempre responde em português de forma natural e fluente, independentemente do idioma utilizado pelo usuário.",
+    "Russian": "Ты полезный помощник, который всегда отвечает на русском языке плавно и естественно, независимо от языка пользователя.",
+    "Chinese": "你是一个有用的助手，总是用流畅自然的中文回答问题，无论用户使用哪种语言。",
+    "Japanese": "あなたは役に立つアシスタントであり、常に流暢で自然な日本語で応答します。ユーザーが使用する言語に関係なく、日本語で対応してください。",
+    "Korean": "당신은 유용한 도우미이며, 항상 유창하고 자연스러운 한국어로 응답합니다. 사용자가 어떤 언어를 사용하든 한국어로 대답하세요.",
+    "Hebrew": " אתה עוזר טוב ומועיל שמדבר בעברית ועונה בעברית.",
 }
 
-client = InferenceClient(
-    token=os.getenv("HF_TOKEN"),
-    model=(
-        os.getenv("MODEL", "meta-llama/Llama-3.2-11B-Vision-Instruct")
-        if not os.getenv("BASE_URL")
-        else None
-    ),
-    base_url=os.getenv("BASE_URL"),
-)
+
+BASE_MODEL = os.getenv("MODEL", "meta-llama/Llama-3.2-11B-Vision-Instruct")
+
+
+def create_inference_client(
+    model: Optional[str] = None, base_url: Optional[str] = None
+) -> InferenceClient:
+    """Create an InferenceClient instance with the given model or environment settings.
+
+    Args:
+        model: Optional model identifier to use. If not provided, will use environment settings.
+
+    Returns:
+        InferenceClient: Configured client instance
+    """
+    return InferenceClient(
+        token=os.getenv("HF_TOKEN"),
+        model=model if model else (BASE_MODEL if not base_url else None),
+        base_url=base_url,
+    )
+
+
+LANGUAGES_TO_CLIENT = {
+    "English": create_inference_client(),
+    "Dutch": create_inference_client(),
+    "Italian": create_inference_client(),
+    "Spanish": create_inference_client(),
+    "French": create_inference_client(),
+    "German": create_inference_client(),
+    "Portuguese": create_inference_client(),
+    "Russian": create_inference_client(),
+    "Chinese": create_inference_client(),
+    "Japanese": create_inference_client(),
+    "Korean": create_inference_client(),
+}
 
 
 def add_user_message(history, message):
-    for x in message["files"]:
-        history.append({"role": "user", "content": {"path": x}})
-    if message["text"] is not None:
-        history.append({"role": "user", "content": message["text"]})
-    return history, gr.MultimodalTextbox(value=None, interactive=False)
+    if isinstance(message, dict) and "files" in message:
+        for x in message["files"]:
+            history.append({"role": "user", "content": {"path": x}})
+        if message["text"] is not None:
+            history.append({"role": "user", "content": message["text"]})
+    else:
+        history.append({"role": "user", "content": message})
+    return history, gr.Textbox(value=None, interactive=False)
 
 
 def format_system_message(language: str, history: list):
@@ -128,7 +157,11 @@ def _process_rating(rating) -> int:
 
 
 def add_fake_like_data(
-    history: list, session_id: str, language: str, liked: bool = False
+    history: list,
+    conversation_id: str,
+    session_id: str,
+    language: str,
+    liked: bool = False,
 ) -> None:
     data = {
         "index": len(history) - 1,
@@ -138,17 +171,25 @@ def add_fake_like_data(
     _, dataframe = wrangle_like_data(
         gr.LikeData(target=None, data=data), history.copy()
     )
-    submit_conversation(dataframe, session_id, language)
+    submit_conversation(
+        dataframe=dataframe,
+        conversation_id=conversation_id,
+        session_id=session_id,
+        language=language,
+    )
 
 
-def respond_system_message(
-    history: list, temperature: Optional[float] = None, seed: Optional[int] = None
+def respond(
+    history: list,
+    language: str,
+    temperature: Optional[float] = None,
+    seed: Optional[int] = None,
 ) -> list:  # -> list:
     """Respond to the user message with a system message
 
     Return the history with the new message"""
     messages = format_history_as_messages(history)
-    response = client.chat.completions.create(
+    response = LANGUAGES_TO_CLIENT[language].chat.completions.create(
         messages=messages,
         max_tokens=2000,
         stream=False,
@@ -187,7 +228,11 @@ def wrangle_like_data(x: gr.LikeData, history) -> DataFrame:
         if isinstance(message, gr.ChatMessage):
             message = message.__dict__
         if idx == liked_index:
-            message["metadata"] = {"title": "liked" if x.liked else "disliked"}
+            if x.liked is True:
+                message["metadata"] = {"title": "liked"}
+            elif x.liked is False:
+                message["metadata"] = {"title": "disliked"}
+
         if not isinstance(message["metadata"], dict):
             message["metadata"] = message["metadata"].__dict__
         rating = message["metadata"].get("title")
@@ -221,7 +266,12 @@ def wrangle_like_data(x: gr.LikeData, history) -> DataFrame:
 
 
 def wrangle_edit_data(
-    x: gr.EditData, history: list, dataframe: DataFrame, session_id: str, language: str
+    x: gr.EditData,
+    history: list,
+    dataframe: DataFrame,
+    conversation_id: str,
+    session_id: str,
+    language: str,
 ) -> list:
     """Edit the conversation and add negative feedback if assistant message is edited, otherwise regenerate the message
 
@@ -237,20 +287,41 @@ def wrangle_edit_data(
 
     if history[index]["role"] == "user":
         # Add feedback on original and corrected message
-        add_fake_like_data(history[: index + 2], session_id, language, liked=True)
         add_fake_like_data(
-            history[: index + 1] + [original_message], session_id, language
+            history=history[: index + 2],
+            conversation_id=conversation_id,
+            session_id=session_id,
+            language=language,
+            liked=True,
         )
-        history = respond_system_message(
-            history[: index + 1],
+        add_fake_like_data(
+            history=history[: index + 1] + [original_message],
+            conversation_id=conversation_id,
+            session_id=session_id,
+            language=language,
+        )
+        history = respond(
+            history=history[: index + 1],
+            language=language,
             temperature=random.randint(1, 100) / 100,
             seed=random.randint(0, 1000000),
         )
         return history
     else:
         # Add feedback on original and corrected message
-        add_fake_like_data(history[: index + 1], session_id, language, liked=True)
-        add_fake_like_data(history[:index] + [original_message], session_id, language)
+        add_fake_like_data(
+            history=history[: index + 1],
+            conversation_id=conversation_id,
+            session_id=session_id,
+            language=language,
+            liked=True,
+        )
+        add_fake_like_data(
+            history=history[:index] + [original_message],
+            conversation_id=conversation_id,
+            session_id=session_id,
+            language=language,
+        )
         history = history[: index + 1]
         # add chosen and rejected options
         history[-1]["options"] = [
@@ -261,23 +332,34 @@ def wrangle_edit_data(
 
 
 def wrangle_retry_data(
-    x: gr.RetryData, history: list, dataframe: DataFrame, session_id: str, language: str
+    x: gr.RetryData,
+    history: list,
+    dataframe: DataFrame,
+    conversation_id: str,
+    session_id: str,
+    language: str,
 ) -> list:
     """Respond to the user message with a system message and add negative feedback on the original message
 
     Return the history with the new message"""
-    add_fake_like_data(history, session_id, language)
+    add_fake_like_data(
+        history=history,
+        conversation_id=conversation_id,
+        session_id=session_id,
+        language=language,
+    )
 
     # Return the history without a new message
-    history = respond_system_message(
-        history[:-1],
+    history = respond(
+        history=history[:-1],
+        language=language,
         temperature=random.randint(1, 100) / 100,
         seed=random.randint(0, 1000000),
     )
     return history, update_dataframe(dataframe, history)
 
 
-def submit_conversation(dataframe, session_id, language):
+def submit_conversation(dataframe, conversation_id, session_id, language):
     """ "Submit the conversation to dataset repo"""
     if dataframe.empty or len(dataframe) < 2:
         gr.Info("No feedback to submit.")
@@ -290,11 +372,10 @@ def submit_conversation(dataframe, session_id, language):
         "conversation": conversation,
         "timestamp": datetime.now().isoformat(),
         "session_id": session_id,
-        "conversation_id": str(uuid.uuid4()),
+        "conversation_id": conversation_id,
         "language": language,
     }
     save_feedback(input_object=conversation_data)
-    gr.Info("Submitted your feedback!")
     return (gr.Dataframe(value=None, interactive=False), [])
 
 
@@ -317,7 +398,9 @@ with gr.Blocks(css=css) as demo:
 
     with gr.Accordion("Explanation") as explanation:
         gr.Markdown(f"""
-        FeeL is a collaboration between Hugging Face and MIT. It is a community-driven project to provide a real-time feedback loop for VLMs, where your feedback is continuously used to train the model. The [dataset](https://huggingface.co/datasets/{scheduler.repo_id}) and [code](https://github.com/huggingface/feel) are public.
+        FeeL is a collaboration between Hugging Face and MIT.
+        It is a community-driven project to provide a real-time feedback loop for VLMs, where your feedback is continuously used to fine-tune the underlying models.
+        The [dataset](https://huggingface.co/datasets/{scheduler.repo_id}), [code](https://github.com/huggingface/feel) and [models](https://huggingface.co/collections/feel-fl/feel-models-67a9b6ef0fdd554315e295e8) are public.
 
         Start by selecting your language, chat with the model with text and images and provide feedback in different ways.
 
@@ -325,13 +408,19 @@ with gr.Blocks(css=css) as demo:
         - 👍/👎 Like or dislike a message
         - 🔄 Regenerate a message
 
-        Some feedback is automatically submitted allowing you to continue chatting, but you can also submit and reset the conversation by clicking "💾 Submit conversation" (under the chat) or trash the conversation by clicking "🗑️" (upper right corner).
+        Feedback is automatically submitted allowing you to continue chatting, but you can also submit and reset the conversation by clicking "💾 Submit conversation" (under the chat) or trash the conversation by clicking "🗑️" (upper right corner).
         """)
         language = gr.Dropdown(
             choices=list(LANGUAGES.keys()), label="Language", interactive=True
         )
 
     session_id = gr.Textbox(
+        interactive=False,
+        value=str(uuid.uuid4()),
+        visible=False,
+    )
+
+    conversation_id = gr.Textbox(
         interactive=False,
         value=str(uuid.uuid4()),
         visible=False,
@@ -351,19 +440,17 @@ with gr.Blocks(css=css) as demo:
         feedback_options=["Like", "Dislike"],
     )
 
-    chat_input = gr.MultimodalTextbox(
+    chat_input = gr.Textbox(
         interactive=True,
-        file_count="multiple",
         placeholder="Enter message or upload file...",
         show_label=False,
         submit_btn=True,
     )
 
-    dataframe = gr.Dataframe(wrap=True, label="Collected feedback")
+    with gr.Accordion("Collected feedback", open=False):
+        dataframe = gr.Dataframe(wrap=True, label="Collected feedback")
 
-    submit_btn = gr.Button(
-        value="💾 Submit conversation",
-    )
+    submit_btn = gr.Button(value="💾 Submit conversation", visible=False)
 
     ##############################
     # Deal with feedback
@@ -379,34 +466,46 @@ with gr.Blocks(css=css) as demo:
         fn=add_user_message,
         inputs=[chatbot, chat_input],
         outputs=[chatbot, chat_input],
-    ).then(respond_system_message, chatbot, chatbot, api_name="bot_response").then(
+    ).then(respond, inputs=[chatbot, language], outputs=[chatbot]).then(
         lambda: gr.Textbox(interactive=True), None, [chat_input]
-    ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe])
+    ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe]).then(
+        submit_conversation,
+        inputs=[dataframe, conversation_id, session_id, language],
+    )
 
     chatbot.like(
         fn=wrangle_like_data,
         inputs=[chatbot],
         outputs=[chatbot, dataframe],
         like_user_message=False,
+    ).then(
+        submit_conversation,
+        inputs=[dataframe, conversation_id, session_id, language],
     )
 
     chatbot.retry(
         fn=wrangle_retry_data,
-        inputs=[chatbot, dataframe, session_id, language],
+        inputs=[chatbot, dataframe, conversation_id, session_id, language],
         outputs=[chatbot, dataframe],
     )
 
     chatbot.edit(
         fn=wrangle_edit_data,
-        inputs=[chatbot, dataframe, session_id, language],
+        inputs=[chatbot, dataframe, conversation_id, session_id, language],
         outputs=[chatbot],
     ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe])
 
-    submit_btn.click(
+    gr.on(
+        triggers=[submit_btn.click, chatbot.clear],
         fn=submit_conversation,
-        inputs=[dataframe, session_id, language],
+        inputs=[dataframe, conversation_id, session_id, language],
         outputs=[dataframe, chatbot],
+    ).then(
+        fn=lambda x: str(uuid.uuid4()),
+        inputs=[conversation_id],
+        outputs=[conversation_id],
     )
+
     demo.load(
         lambda: str(uuid.uuid4()),
         inputs=[],
@@ -414,5 +513,3 @@ with gr.Blocks(css=css) as demo:
     )
 
 demo.launch()
-
-# /private/var/folders/9t/msy700h16jz3q35qvg4z1ln40000gn/T/gradio/a5013b9763ad9f2192254540fee226539fbcd1382cbc2317b916aef469bb01b9/Screenshot 2025-01-13 at 08.02.26.png
