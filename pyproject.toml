@@ -17,4 +17,5 @@ ml = [
 app = [
     "gradio>=5.10.0",
     "huggingface-hub>=0.26.5",
+    "transformers>=4.47.1",
 ]
