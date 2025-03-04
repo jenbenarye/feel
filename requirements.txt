@@ -106,3 +106,4 @@ wcwidth==0.2.13
 xxhash==3.5.0
 yarl==1.18.3
 bitsandbytes==0.45.3
+accelerate>=0.26.0
