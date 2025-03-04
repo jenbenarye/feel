@@ -58,19 +58,7 @@ def create_inference_client(
         )
 
 
-LANGUAGES_TO_CLIENT = {
-    "English": create_inference_client(),
-    "Dutch": create_inference_client(),
-    "Italian": create_inference_client(),
-    "Spanish": create_inference_client(),
-    "French": create_inference_client(),
-    "German": create_inference_client(),
-    "Portuguese": create_inference_client(),
-    "Russian": create_inference_client(),
-    "Chinese": create_inference_client(),
-    "Japanese": create_inference_client(),
-    "Korean": create_inference_client(),
-}
+CLIENT = create_inference_client()
 
 
 def add_user_message(history, message):
@@ -188,7 +176,7 @@ def add_fake_like_data(
 
 @spaces.GPU
 def call_pipeline(messages: list, language: str):
-    response = LANGUAGES_TO_CLIENT[language](messages)
+    response = CLIENT(messages)
     content = response[0]["generated_text"][-1]["content"]
     return content
 
@@ -205,7 +193,7 @@ def respond(
     if ZERO_GPU:
         content = call_pipeline(messages, language)
     else:
-        response = LANGUAGES_TO_CLIENT[language].chat.completions.create(
+        response = CLIENT.chat.completions.create(
             messages=messages,
             max_tokens=2000,
             stream=False,
