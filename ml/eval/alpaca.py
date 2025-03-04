@@ -33,10 +33,9 @@ def judge_responses(response1, response2, prompt):
 
 
 
-def alpaca_evaluator(model_name, model_path, num_samples=200):
+def alpaca_evaluator(model_name, num_samples=200):
     results = run_evaluation(
         model=model_name,
-        model_path=model_path,
         num_samples=num_samples,  # fewer samples for quick testing
         reference_model="gpt-4",  # Compare against GPT-4 (optional)
     )

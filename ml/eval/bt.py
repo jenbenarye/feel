@@ -52,19 +52,19 @@ def bradley_terry_comparison(old_rewards, new_rewards):
     probabilities = []
 
     for ix in range(len(old_rewards)):
-        old = sft_rewards[ix]
-        new = kto_rewards[ix]
+        old = old_rewards[ix]
+        new = new_rewards[ix]
 
         # Ensure prompts match
         assert old['prompt'] == new['prompt'], f"ERROR: Prompts at index {ix} do not match."
 
         # Compute Bradley-Terry probability
-        new_reward = torch.tensor(kto['reward'], dtype=torch.float32)
-        old_reward = torch.tensor(sft['reward'], dtype=torch.float32)
-        prob_new_preferred = torch.sigmoid(kto_reward - old_reward).item()
+        new_reward = torch.tensor(old['reward'], dtype=torch.float32)
+        old_reward = torch.tensor(new['reward'], dtype=torch.float32)
+        prob_new_preferred = torch.sigmoid(new_reward - old_reward).item()
 
         probabilities.append(prob_new_preferred)
-        preferred_model = 'new' if prob_kto_preferred > 0.5 else 'old'
+        preferred_model = 'new' if prob_new_preferred > 0.5 else 'old'
 
         # Count preferences
         if preferred_model == 'new':
@@ -75,12 +75,12 @@ def bradley_terry_comparison(old_rewards, new_rewards):
         # Log results
         bt_result = {
             'prompt': old['prompt'],
-            'old_output': sft['output'],
-            'new_output': kto['output'],
-            'old_reward': sft['reward'],
-            'new_reward': kto['reward'],
+            'old_output': old['output'],
+            'new_output': new['output'],
+            'old_reward': old['reward'],
+            'new_reward': new['reward'],
             'preferred': preferred_model,
-            'prob_new_preferred': prob_kto_preferred
+            'prob_new_preferred': prob_new_preferred
         }
         results.append(bt_result)
 
@@ -88,8 +88,8 @@ def bradley_terry_comparison(old_rewards, new_rewards):
     total_examples = len(old_rewards)
     metrics = {
         'total_examples': total_examples,
-        'new_preferred_percentage': 100 * kto_preferred_count / total_examples,
-        'old_preferred_percentage': 100 * sft_preferred_count / total_examples,
+        'new_preferred_percentage': 100 * new_preferred_count / total_examples,
+        'old_preferred_percentage': 100 * old_preferred_count / total_examples,
         'avg_probability_new_preferred': sum(probabilities) / total_examples
     }
 
@@ -128,10 +128,8 @@ def print_metrics(metrics):
 ####################################
 
 def main():
-    # Initialize script arguments
     args = ScriptArguments()
 
-    # Load data
     print("Loading data...")
     old_rewards = load_rewards(args.sft_generations_file)
     new_rewards = load_rewards(args.kto_generations_file)
@@ -140,10 +138,7 @@ def main():
     print("Performing Bradley-Terry comparison...")
     results, metrics = bradley_terry_comparison(old_rewards, new_rewards)
 
-    # Save results
     save_results(results, args.output_file)
-
-    # Print metrics
     print_metrics(metrics)
 
 
