@@ -1,6 +1,4 @@
-import torch
 from dataclasses import dataclass
-from accelerate import PartialState
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import ModelConfig, maybe_unpair_preference_dataset, setup_chat_format
@@ -8,14 +6,9 @@ from tqdm import tqdm
 import json
 import os
 import sys
-from pdb import set_trace as st
-
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
-
-from dataloaders.data_loader import get_oasst
-
 
 ####################################
 #  CONFIGURATION
@@ -96,7 +89,7 @@ def load_oasst_test_dataset():
     """Load and prepare the dataset."""
 
     # Load oasst test dataset
-    test_dataset = get_oasst(split='test')
+    test_dataset = load_dataset(split='test')
     return test_dataset
 
 
