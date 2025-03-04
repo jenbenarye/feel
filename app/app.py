@@ -187,7 +187,7 @@ def add_fake_like_data(
     )
 
 @spaces.GPU
-def call_pipeline(messages: list):
+def call_pipeline(messages: list, language: str):
     response = LANGUAGES_TO_CLIENT[language](messages)
     content = response[0]["generated_text"][-1]["content"]
     return content
@@ -203,7 +203,7 @@ def respond(
     Return the history with the new message"""
     messages = format_history_as_messages(history)
     if ZERO_GPU:
-        content = call_pipeline(messages)
+        content = call_pipeline(messages, language)
     else:
         response = LANGUAGES_TO_CLIENT[language].chat.completions.create(
             messages=messages,
