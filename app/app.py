@@ -13,7 +13,7 @@ from feedback import save_feedback, scheduler
 from gradio.components.chatbot import Option
 from huggingface_hub import InferenceClient
 from pandas import DataFrame
-from transformers import pipeline
+from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
 
 
 LANGUAGES: dict[str, str] = {
@@ -47,7 +47,9 @@ def create_inference_client(
         InferenceClient: Configured client instance
     """
     if ZERO_GPU:
-        return pipeline("text-generation", model=BASE_MODEL)
+        tokenizer = AutoTokenizer.from_pretrained(model)
+        model = AutoModelForCausalLM.from_pretrained(model, load_in_4bit=True)
+        return pipeline("text-generation", model=model, tokenizer=tokenizer)
     else:
         return InferenceClient(
             token=os.getenv("HF_TOKEN"),
