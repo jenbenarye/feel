@@ -33,7 +33,7 @@ LANGUAGES: dict[str, str] = {
 
 
 BASE_MODEL = os.getenv("MODEL", "meta-llama/Llama-3.2-11B-Vision-Instruct")
-ZERO_GPU = os.getenv("  ", False)
+ZERO_GPU = bool(os.getenv("  ", False))
 
 def create_inference_client(
     model: Optional[str] = None, base_url: Optional[str] = None
