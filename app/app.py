@@ -47,8 +47,8 @@ def create_inference_client(
         InferenceClient: Configured client instance
     """
     if ZERO_GPU:
-        tokenizer = AutoTokenizer.from_pretrained(model)
-        model = AutoModelForCausalLM.from_pretrained(model, load_in_4bit=True)
+        tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
+        model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, load_in_4bit=True)
         return pipeline("text-generation", model=model, tokenizer=tokenizer)
     else:
         return InferenceClient(
