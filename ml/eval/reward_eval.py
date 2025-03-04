@@ -3,10 +3,8 @@ import os
 from typing import Any, Dict, List
 import json 
 import torch
-import transformers
-from transformers import AutoModelForCausalLM, AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoModelForCausalLM, AutoTokenizer, CohereConfig, AutoModel
 from accelerate import Accelerator
-from trl import KTOConfig, KTOTrainer, ModelConfig, get_peft_config, maybe_unpair_preference_dataset, setup_chat_format
 from tqdm import tqdm
 
 # Add script directory to system path for importing local modules
@@ -24,7 +22,7 @@ def create_model(model_name: str):
     """
     loads pre-trained reward model and moves it onto device
     """
-    model = AutoModelForSequenceClassification.from_pretrained(model_name, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2", num_labels=1).to("cuda")
+    model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2", num_labels=1).to("cuda")
     return model
 
 
@@ -91,10 +89,10 @@ def process_evaluation(args, model_name: str, eval_data_list_dict) -> List[Dict[
     """
     Main function for processing evaluation, takes model name as input.
     """
-    mixed_precision = 'bf16' if args.bfloat16 else 'fp16'
-
+    # mixed_precision = 'bf16' if args.bfloat16 else 'fp16'
+    
     # Initialize accelerator and model
-    accelerator = MyAccelerator(mixed_precision)
+    # accelerator = MyAccelerator(mixed_precision)
     model = create_model(model_name)
     tokenizer = create_tokenizer(model_name)
 
@@ -111,15 +109,15 @@ def process_evaluation(args, model_name: str, eval_data_list_dict) -> List[Dict[
 
 # ONLY FOR TESTING: 
 if __name__ == '__main__':
-    args = {
-        'bfloat16': False,  
-        'reward_output_fmt': '1-0',
-        'apply_sigmoid_to_reward': False,
-        'per_device_batch_size': 8,
-        'output_filepath': '/path/to/your/data.json',
-        'result_filename': None,
-    }
+    args = EvalArguments(bfloat16=True, 
+                         reward_output_fmt='1-0', 
+                         apply_sigmoid_to_reward=False,
+                         per_device_batch_size=8,
+                         output_filepath= '/path/to/your/data.json',
+                         result_filename=None,
+                         model_name_or_path="CohereForAI/aya-expanse-8b")
+
 
     eval_data_list_dict = [{"prompt": "How are you?", "output": "I'm doing great!"}, {"prompt": "What's your name?", "output": "Assistant"}]
 
-    process_evaluation(args, model_name="CohereForAI/aya-23-8B", eval_data_list_dict=eval_data_list_dict)
+    process_evaluation(args, model_name="CohereForAI/aya-expanse-8b", eval_data_list_dict=eval_data_list_dict)
