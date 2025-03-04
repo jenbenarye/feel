@@ -105,4 +105,4 @@ urllib3==2.3.0
 wcwidth==0.2.13
 xxhash==3.5.0
 yarl==1.18.3
-bitsandbytes==0.45.3 @ registry+https://pypi.org/simple
+bitsandbytes==0.45.3
