@@ -12,6 +12,8 @@ from feedback import save_feedback, scheduler
 from gradio.components.chatbot import Option
 from huggingface_hub import InferenceClient
 from pandas import DataFrame
+from transformers import pipeline
+
 
 LANGUAGES: dict[str, str] = {
     "English": "You are a helpful assistant. Always respond to requests in fluent and natural English, regardless of the language used by the user.",
@@ -30,7 +32,7 @@ LANGUAGES: dict[str, str] = {
 
 
 BASE_MODEL = os.getenv("MODEL", "meta-llama/Llama-3.2-11B-Vision-Instruct")
-
+ZERO_GPU = os.getenv("ZERO_GPU", False)
 
 def create_inference_client(
     model: Optional[str] = None, base_url: Optional[str] = None
@@ -43,11 +45,14 @@ def create_inference_client(
     Returns:
         InferenceClient: Configured client instance
     """
-    return InferenceClient(
-        token=os.getenv("HF_TOKEN"),
-        model=model if model else (BASE_MODEL if not base_url else None),
-        base_url=base_url,
-    )
+    if ZERO_GPU:
+        return pipeline("text-generation", model=BASE_MODEL)
+    else:
+        return InferenceClient(
+            token=os.getenv("HF_TOKEN"),
+            model=model if model else (BASE_MODEL if not base_url else None),
+            base_url=base_url,
+        )
 
 
 LANGUAGES_TO_CLIENT = {
@@ -189,14 +194,18 @@ def respond(
 
     Return the history with the new message"""
     messages = format_history_as_messages(history)
-    response = LANGUAGES_TO_CLIENT[language].chat.completions.create(
-        messages=messages,
-        max_tokens=2000,
-        stream=False,
-        seed=seed,
-        temperature=temperature,
-    )
-    content = response.choices[0].message.content
+    if ZERO_GPU:
+        response = LANGUAGES_TO_CLIENT[language](messages)
+        content = response[0]["generated_text"][-1]["content"]
+    else:
+        response = LANGUAGES_TO_CLIENT[language].chat.completions.create(
+            messages=messages,
+            max_tokens=2000,
+            stream=False,
+            seed=seed,
+            temperature=temperature,
+        )
+        content = response.choices[0].message.content
     message = gr.ChatMessage(role="assistant", content=content)
     history.append(message)
     return history
