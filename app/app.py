@@ -33,8 +33,17 @@ LANGUAGES: dict[str, str] = {
 
 
 BASE_MODEL = os.getenv("MODEL", "meta-llama/Llama-3.2-11B-Vision-Instruct")
-ZERO_GPU = bool(os.getenv("ZERO_GPU", False)) or True if str(os.getenv("ZERO_GPU")).lower() == "true" else False
-TEXT_ONLY = bool(os.getenv("TEXT_ONLY", False)) or True if str(os.getenv("TEXT_ONLY")).lower() == "true" else False
+ZERO_GPU = (
+    bool(os.getenv("ZERO_GPU", False)) or True
+    if str(os.getenv("ZERO_GPU")).lower() == "true"
+    else False
+)
+TEXT_ONLY = (
+    bool(os.getenv("TEXT_ONLY", False)) or True
+    if str(os.getenv("TEXT_ONLY")).lower() == "true"
+    else False
+)
+
 
 def create_inference_client(
     model: Optional[str] = None, base_url: Optional[str] = None
@@ -50,7 +59,12 @@ def create_inference_client(
     if ZERO_GPU:
         tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
         model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, load_in_8bit=True)
-        return pipeline("text-generation", model=model, tokenizer=tokenizer)
+        return pipeline(
+            "text-generation",
+            model=model,
+            tokenizer=tokenizer,
+            model_kwargs={"max_new_tokens": 2000},
+        )
     else:
         return InferenceClient(
             token=os.getenv("HF_TOKEN"),
@@ -94,12 +108,7 @@ def format_history_as_messages(history: list):
 
     if TEXT_ONLY:
         for entry in history:
-            messages.append(
-                {
-                    "role": entry["role"],
-                    "content": entry["content"]
-                }
-            )
+            messages.append({"role": entry["role"], "content": entry["content"]})
         return messages
 
     for entry in history:
@@ -185,15 +194,13 @@ def add_fake_like_data(
         language=language,
     )
 
+
 @spaces.GPU
 def call_pipeline(messages: list, language: str):
     response = CLIENT(messages)
-    print(" ### response ### ")
-    print(response)
     content = response[0]["generated_text"][-1]["content"]
-    print(" ### content ### ")
-    print(content)
     return content
+
 
 def respond(
     history: list,
