@@ -8,6 +8,8 @@ dependencies = [
     "datasets>=3.1.0",
     "distilabel>=1.4.1",
     "ipykernel>=6.29.5",
+    "torch>=2.5.1",
+    "transformers>=4.47.1",
 ]
 
 [dependency-groups]

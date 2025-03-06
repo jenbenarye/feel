@@ -188,7 +188,11 @@ def add_fake_like_data(
 @spaces.GPU
 def call_pipeline(messages: list, language: str):
     response = CLIENT(messages)
+    print(" ### response ### ")
+    print(response)
     content = response[0]["generated_text"][-1]["content"]
+    print(" ### content ### ")
+    print(content)
     return content
 
 def respond(
