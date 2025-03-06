@@ -58,12 +58,13 @@ def create_inference_client(
     """
     if ZERO_GPU:
         tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
-        model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, load_in_8bit=True)
+        model = AutoModelForCausalLM.from_pretrained(
+            BASE_MODEL, load_in_8bit=True, max_new_tokens=2000
+        )
         return pipeline(
             "text-generation",
             model=model,
             tokenizer=tokenizer,
-            model_kwargs={"max_new_tokens": 2000},
         )
     else:
         return InferenceClient(
