@@ -32,7 +32,7 @@ def evaluator_master_fn(eval_dataset: list[dict],
                         new_model,
                         old_model="CohereForAI/aya-expanse-8b"): 
     # language is string for now, will be an object later with FeeLLanguage class definition with specific lanugage 
-    # functionalities (will also store latest model)
+    # functionalities (will also store latest model and be much easier to handle such functions) 
     
     # 1. Reward score evaluation: 
     args = EvalArguments(bfloat16=True, 
