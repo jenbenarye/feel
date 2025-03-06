@@ -199,7 +199,7 @@ def call_pipeline(messages: list, language: str):
     response = CLIENT(
         messages,
         clean_up_tokenization_spaces=False,
-        generate_kwargs={"max_length": 2000},
+        max_length=2000,
     )
     content = response[0]["generated_text"][-1]["content"]
     return content
