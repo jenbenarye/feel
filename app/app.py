@@ -305,6 +305,9 @@ css = """
 .option.svelte-pcaovb {
     display: none !important;
 }
+.retry-btn {
+    display: none !important;
+}
 """
 
 with gr.Blocks(css=css) as demo:
