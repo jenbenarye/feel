@@ -386,6 +386,22 @@ css = """
 .option.svelte-pcaovb {
     display: none !important;
 }
+.language-banner {
+    background-color: rgba(72, 209, 204, 0.1);
+    border-left: 4px solid rgb(72, 209, 204);
+    padding: 10px 15px;
+    margin-bottom: 15px;
+    border-radius: 0 4px 4px 0;
+    font-weight: 500;
+}
+.turquoise-button {
+    background-color: #40E0D0 !important;
+    border-color: #40E0D0 !important;
+}
+.turquoise-button:hover {
+    background-color: #48D1CC !important;
+    border-color: #48D1CC !important;
+}
 """
 
 with gr.Blocks(css=css) as demo:
@@ -393,26 +409,42 @@ with gr.Blocks(css=css) as demo:
     # Chatbot
     ##############################
     gr.Markdown("""
-    # ♾️ FeeL - a real-time Feedback Loop for LMs
+    # ♾️ FeeL: real-time Feedback Loop for LMs
+     ## Making multilingual LMs better, one Feedback Loop at a time
+    ### MIT | Hugging Face | IBM | Cohere
     """)
 
-    with gr.Accordion("Explanation") as explanation:
-        gr.Markdown(f"""
-        FeeL is a collaboration between Hugging Face and MIT.
-        It is a community-driven project to provide a real-time feedback loop for VLMs, where your feedback is continuously used to fine-tune the underlying models.
-        The [dataset](https://huggingface.co/datasets/{scheduler.repo_id}), [code](https://github.com/huggingface/feel) and [models](https://huggingface.co/collections/feel-fl/feel-models-67a9b6ef0fdd554315e295e8) are public.
+    with gr.Row():
+        # Main content column (larger)
+        with gr.Column(scale=3):
+            with gr.Accordion("What is FeeL?") as explanation:
+                gr.Markdown(f"""
+                FeeL is an open platform that improves multilingual AI through user feedback.\\
+                FeeL lets you **chat, provide feedback, and shape AI in your language**. Your input helps create better, culturally aware open source models — by users, for users.
 
-        Start by selecting your language, chat with the model with text and images and provide feedback in different ways.
+                How It Works:
+                1. Choose a language (or add one)
+                2. Chat with the model
+                3. Give feedback:
+                   - 👍 Like a good response
+                   - 👎 Dislike a bad response
+                   - 🔄 Regenerate for a better attempt
+                   - ✏️ Edit to improve accuracy
+                4. Submit your feedback—it becomes part of an open dataset for multilingual RLHF, directly improving the model
 
-        - ✏️ Edit a message
-        - 👍/👎 Like or dislike a message
-        - 🔄 Regenerate a message
+                The [dataset](https://huggingface.co/datasets/{scheduler.repo_id}), [code](https://github.com/huggingface/feel) and [models](https://huggingface.co/collections/feel-fl/feel-models-67a9b6ef0fdd554315e295e8) are public.
+                """)
 
-        Feedback is automatically submitted allowing you to continue chatting, but you can also submit and reset the conversation by clicking "💾 Submit conversation" (under the chat) or trash the conversation by clicking "🗑️" (upper right corner).
-        """)
-        language = gr.Dropdown(
-            choices=list(LANGUAGES.keys()), label="Language", interactive=True
-        )
+        # Language selection column (smaller)
+        with gr.Column(scale=1):
+            # First put the banner
+            gr.Markdown('<div class="language-banner">Select your language, or add a new one</div>')
+            # Then put the dropdown below it
+            language = gr.Dropdown(
+                choices=list(LANGUAGES.keys()),
+                label="Language",
+                interactive=True
+            )
 
     session_id = gr.Textbox(
         interactive=False,
@@ -450,7 +482,14 @@ with gr.Blocks(css=css) as demo:
     with gr.Accordion("Collected feedback", open=False):
         dataframe = gr.Dataframe(wrap=True, label="Collected feedback")
 
-    submit_btn = gr.Button(value="💾 Submit conversation", visible=False)
+    with gr.Row():
+        submit_btn = gr.Button(
+            value="💾 Submit conversation",
+            visible=True,
+            variant="primary",
+            elem_classes="turquoise-button"
+        )
+        clear_btn = gr.Button(value="🗑️ Clear chat")
 
     ##############################
     # Deal with feedback
@@ -504,6 +543,11 @@ with gr.Blocks(css=css) as demo:
         fn=lambda x: str(uuid.uuid4()),
         inputs=[conversation_id],
         outputs=[conversation_id],
+    )
+
+    clear_btn.click(
+        fn=lambda: (None, None),
+        outputs=[chatbot, chat_input]
     )
 
     demo.load(
