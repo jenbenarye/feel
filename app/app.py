@@ -8,11 +8,14 @@ from pathlib import Path
 from typing import Optional
 import json
 import os
+import spaces
 import gradio as gr
 from feedback import save_feedback, scheduler
 # from gradio.components.chatbot import Option
 from huggingface_hub import InferenceClient
 from pandas import DataFrame
+from transformers import pipeline, AutoTokenizer, CohereForCausalLM
+
 
 LANGUAGES: dict[str, str] = {
     "English": "You are a helpful assistant. Always respond to requests in fluent and natural English, regardless of the language used by the user.",
@@ -31,6 +34,16 @@ LANGUAGES: dict[str, str] = {
 
 
 BASE_MODEL = os.getenv("MODEL", "meta-llama/Llama-3.2-11B-Vision-Instruct")
+ZERO_GPU = (
+    bool(os.getenv("ZERO_GPU", False)) or True
+    if str(os.getenv("ZERO_GPU")).lower() == "true"
+    else False
+)
+TEXT_ONLY = (
+    bool(os.getenv("TEXT_ONLY", False)) or True
+    if str(os.getenv("TEXT_ONLY")).lower() == "true"
+    else False
+)
 
 
 def create_inference_client(
@@ -44,26 +57,23 @@ def create_inference_client(
     Returns:
         InferenceClient: Configured client instance
     """
-    return InferenceClient(
-        token=os.getenv("HF_TOKEN"),
-        model=model if model else (BASE_MODEL if not base_url else None),
-        base_url=base_url,
-    )
+    if ZERO_GPU:
+        tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
+        model = CohereForCausalLM.from_pretrained(BASE_MODEL, load_in_8bit=True)
+        return pipeline(
+            "text-generation",
+            model=model,
+            tokenizer=tokenizer,
+        )
+    else:
+        return InferenceClient(
+            token=os.getenv("HF_TOKEN"),
+            model=model if model else (BASE_MODEL if not base_url else None),
+            base_url=base_url,
+        )
 
 
-LANGUAGES_TO_CLIENT = {
-    "English": create_inference_client(),
-    "Dutch": create_inference_client(),
-    "Italian": create_inference_client(),
-    "Spanish": create_inference_client(),
-    "French": create_inference_client(),
-    "German": create_inference_client(),
-    "Portuguese": create_inference_client(),
-    "Russian": create_inference_client(),
-    "Chinese": create_inference_client(),
-    "Japanese": create_inference_client(),
-    "Korean": create_inference_client(),
-}
+CLIENT = create_inference_client()
 
 
 def add_user_message(history, message):
@@ -95,6 +105,11 @@ def format_history_as_messages(history: list):
     messages = []
     current_role = None
     current_message_content = []
+
+    if TEXT_ONLY:
+        for entry in history:
+            messages.append({"role": entry["role"], "content": entry["content"]})
+        return messages
 
     for entry in history:
         content = entry["content"]
@@ -180,6 +195,17 @@ def add_fake_like_data(
     )
 
 
+@spaces.GPU
+def call_pipeline(messages: list, language: str):
+    response = CLIENT(
+        messages,
+        clean_up_tokenization_spaces=False,
+        max_length=2000,
+    )
+    content = response[0]["generated_text"][-1]["content"]
+    return content
+
+
 def respond(
     history: list,
     language: str,
@@ -190,14 +216,17 @@ def respond(
 
     Return the history with the new message"""
     messages = format_history_as_messages(history)
-    response = LANGUAGES_TO_CLIENT[language].chat.completions.create(
-        messages=messages,
-        max_tokens=2000,
-        stream=False,
-        seed=seed,
-        temperature=temperature,
-    )
-    content = response.choices[0].message.content
+    if ZERO_GPU:
+        content = call_pipeline(messages, language)
+    else:
+        response = CLIENT.chat.completions.create(
+            messages=messages,
+            max_tokens=2000,
+            stream=False,
+            seed=seed,
+            temperature=temperature,
+        )
+        content = response.choices[0].message.content
     message = gr.ChatMessage(role="assistant", content=content)
     history.append(message)
     return history
