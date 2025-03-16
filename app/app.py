@@ -495,14 +495,9 @@ with gr.Blocks(css=css) as demo:
     with gr.Accordion("Collected feedback", open=False):
         dataframe = gr.Dataframe(wrap=True, label="Collected feedback")
 
-    with gr.Row():
-        submit_btn = gr.Button(
-            value="💾 Submit conversation",
-            visible=True,
-            variant="primary",
-            elem_classes="turquoise-button"
-        )
-        clear_btn = gr.Button(value="🗑️ Clear chat")
+
+    submit_btn = gr.Button(value="💾 Submit conversation", visible=False)
+    clear_btn = gr.Button(value="🗑️ Clear chat", visible=False)
 
     ##############################
     # Deal with feedback
@@ -548,25 +543,20 @@ with gr.Blocks(css=css) as demo:
     ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe])
 
     gr.on(
-        triggers=[submit_btn.click, chatbot.clear],
-        fn=submit_conversation,
-        inputs=[dataframe, conversation_id, session_id, language],
-        outputs=[dataframe, chatbot],
-    ).then(
-        fn=lambda x: str(uuid.uuid4()),
-        inputs=[conversation_id],
-        outputs=[conversation_id],
-    )
-
-    clear_btn.click(
-        fn=lambda: (None, None),
-        outputs=[chatbot, chat_input]
-    )
+         triggers=[submit_btn.click, chatbot.clear],
+         fn=submit_conversation,
+         inputs=[dataframe, conversation_id, session_id, language],
+         outputs=[dataframe, chatbot],
+     ).then(
+         fn=lambda x: str(uuid.uuid4()),
+         inputs=[conversation_id],
+         outputs=[conversation_id],
+     )
 
     demo.load(
-        lambda: str(uuid.uuid4()),
-        inputs=[],
-        outputs=[session_id],
-    )
+         lambda: str(uuid.uuid4()),
+         inputs=[],
+         outputs=[session_id],
+     )
 
 demo.launch()
