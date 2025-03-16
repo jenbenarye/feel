@@ -416,6 +416,21 @@ css = """
     background-color: #48D1CC !important;
     border-color: #48D1CC !important;
 }
+
+/* Hugging Face yellow button style */
+.hf-yellow-button {
+    background-color: #FFD21E !important;
+    border-color: #FFD21E !important;
+    color: #000000 !important;
+    font-weight: 600 !important;
+}
+
+.hf-yellow-button:hover {
+    background-color: #FFBB00 !important;
+    border-color: #FFBB00 !important;
+    transform: translateY(-2px);
+    transition: all 0.2s ease;
+}
 """
 
 with gr.Blocks(css=css) as demo:
@@ -496,7 +511,12 @@ with gr.Blocks(css=css) as demo:
         dataframe = gr.Dataframe(wrap=True, label="Collected feedback")
 
     with gr.Row():
-        submit_btn = gr.Button(value="💾 Submit conversation")
+        submit_btn = gr.Button(
+            value="💾 Submit conversation",
+            variant="primary",
+            elem_classes=["hf-yellow-button"],
+            visible=True
+        )
         clear_btn = gr.Button(value="🗑️ Clear chat")
 
     ##############################
