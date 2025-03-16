@@ -387,13 +387,27 @@ css = """
     display: none !important;
 }
 .language-banner {
-    background-color: rgba(72, 209, 204, 0.1);
-    border-left: 4px solid rgb(72, 209, 204);
-    padding: 10px 15px;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-left: 4px solid #8e44ad;
+    padding: 12px 15px;
     margin-bottom: 15px;
-    border-radius: 0 4px 4px 0;
-    font-weight: 500;
+    border-radius: 0 8px 8px 0;
+    font-weight: 600;
+    color: #2c3e50;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    text-align: center;
+    animation: banner-glow 2s infinite alternate;
 }
+
+@keyframes banner-glow {
+    from {
+        box-shadow: 0 0 5px rgba(142, 68, 173, 0.2);
+    }
+    to {
+        box-shadow: 0 0 15px rgba(142, 68, 173, 0.6);
+    }
+}
+
 .turquoise-button {
     background-color: #40E0D0 !important;
     border-color: #40E0D0 !important;
@@ -411,12 +425,13 @@ with gr.Blocks(css=css) as demo:
     gr.Markdown("""
     # ♾️ FeeL: real-time Feedback Loop for LMs
      ## Making multilingual LMs better, one Feedback Loop at a time
+    ### MIT | Hugging Face | IBM | Cohere
     """)
 
     with gr.Row():
         # Main content column (larger)
         with gr.Column(scale=3):
-            with gr.Accordion("# What is FeeL?", label="What is FeeL?") as explanation:
+            with gr.Accordion("What is FeeL?") as explanation:
                 gr.Markdown(f"""
                 FeeL is an open platform that improves multilingual AI through user feedback.\\
                 FeeL lets you **chat, provide feedback, and shape AI in your language**. Your input helps create better, culturally aware open source models — by users, for users.
@@ -436,9 +451,8 @@ with gr.Blocks(css=css) as demo:
 
         # Language selection column (smaller)
         with gr.Column(scale=1):
-            # First put the banner
-            gr.Markdown('<div class="language-banner" style="background-color: #E0FFFF; padding: 10px; border-radius: 5px;">Select your language, or add a new one</div>')
-            # Then put the dropdown below it
+            # Updated banner with gradient background and colorful styling
+            gr.Markdown('<div class="language-banner">Select your language, or add a new one</div>')
             language = gr.Dropdown(
                 choices=list(LANGUAGES.keys()),
                 label="Language",
