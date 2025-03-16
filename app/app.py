@@ -411,7 +411,6 @@ with gr.Blocks(css=css) as demo:
     gr.Markdown("""
     # ♾️ FeeL: real-time Feedback Loop for LMs
      ## Making multilingual LMs better, one Feedback Loop at a time
-    ### MIT | Hugging Face | IBM | Cohere
     """)
 
     with gr.Row():
