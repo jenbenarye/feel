@@ -417,7 +417,7 @@ with gr.Blocks(css=css) as demo:
     with gr.Row():
         # Main content column (larger)
         with gr.Column(scale=3):
-            with gr.Accordion("What is FeeL?") as explanation:
+            with gr.Accordion("# What is FeeL?", label="What is FeeL?") as explanation:
                 gr.Markdown(f"""
                 FeeL is an open platform that improves multilingual AI through user feedback.\\
                 FeeL lets you **chat, provide feedback, and shape AI in your language**. Your input helps create better, culturally aware open source models — by users, for users.
@@ -438,7 +438,7 @@ with gr.Blocks(css=css) as demo:
         # Language selection column (smaller)
         with gr.Column(scale=1):
             # First put the banner
-            gr.Markdown('<div class="language-banner">Select your language, or add a new one</div>')
+            gr.Markdown('<div class="language-banner" style="background-color: #E0FFFF; padding: 10px; border-radius: 5px;">Select your language, or add a new one</div>')
             # Then put the dropdown below it
             language = gr.Dropdown(
                 choices=list(LANGUAGES.keys()),
