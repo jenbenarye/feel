@@ -410,6 +410,34 @@ def submit_conversation(dataframe, conversation_id, session_id, language):
     return (gr.Dataframe(value=None, interactive=False), [])
 
 
+def open_add_language_modal():
+    return gr.Group(visible=True)
+
+def close_add_language_modal():
+    return gr.Group(visible=False)
+
+def save_new_language(lang_name, system_prompt):
+    """Save the new language and system prompt to languages.json, then refresh the page."""
+    languages_path = Path(__file__).parent / "languages.json"
+    with open(languages_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    # Add the new language to JSON
+    data[lang_name] = system_prompt
+
+    with open(languages_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    
+    # Update the in-memory language dictionaries
+    update_language_clients()
+    
+    # Update the dropdown choices
+    new_choices = list(LANGUAGES.keys())
+    
+    # Return a message that will trigger a JavaScript refresh
+    return gr.Group(visible=False), gr.HTML("<script>window.location.reload();</script>"), gr.Dropdown(choices=new_choices)
+
+
 css = """
 .options.svelte-pcaovb {
     display: none !important;
@@ -420,27 +448,58 @@ css = """
 .retry-btn {
     display: none !important;
 }
+/* Style for the add language button */
+button#add-language-btn {
+    padding: 0 !important;
+    font-size: 30px !important;
+    font-weight: bold !important;
+}
+/* Style for the user agreement container */
+.user-agreement-container {
+    background-color: white !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1) !important;
+}
+/* Ensure the markdown inside the container inherits the background */
+.user-agreement-container > div {
+    background-color: white !important;
+}
+/* Target all elements inside the container */
+.user-agreement-container * {
+    background-color: white !important;
+}
 """
 
 with gr.Blocks(css=css) as demo:
-    ##############################
-    # Chatbot
-    ##############################
-    gr.Markdown("""
-    # ♾️ FeeL - a real-time Feedback Loop for LMs
-    """)
+    # State variable to track if user has consented
+    user_consented = gr.State(False)
+    
+    # Landing page with user agreement
+    with gr.Group(visible=True) as landing_page:
+        gr.Markdown("# Welcome to FeeL")
+        with gr.Group(elem_classes=["user-agreement-container"]):
+            gr.Markdown(USER_AGREEMENT)
+        consent_btn = gr.Button("Next")
+    
+    # Main application interface (initially hidden)
+    with gr.Group(visible=False) as main_app:
+        ##############################
+        # Chatbot
+        ##############################
+        gr.Markdown("""
+        # ♾️ FeeL - a real-time Feedback Loop for LMs
+        """)
 
-    with gr.Accordion("Explanation") as explanation:
-        gr.Markdown(f"""
-        FeeL is a collaboration between Hugging Face and MIT.
-        It is a community-driven project to provide a real-time feedback loop for VLMs, where your feedback is continuously used to fine-tune the underlying models.
-        The [dataset](https://huggingface.co/datasets/{scheduler.repo_id}), [code](https://github.com/huggingface/feel) and [models](https://huggingface.co/collections/feel-fl/feel-models-67a9b6ef0fdd554315e295e8) are public.
+        with gr.Accordion("About") as explanation:
+            gr.Markdown(f"""
+            FeeL is a collaboration between Hugging Face and MIT.
+            It is a community-driven project to provide a real-time feedback loop for VLMs, where your feedback is continuously used to fine-tune the underlying models.
+            The [dataset](https://huggingface.co/datasets/{scheduler.repo_id}), [code](https://github.com/huggingface/feel) and [models](https://huggingface.co/collections/feel-fl/feel-models-67a9b6ef0fdd554315e295e8) are public.
 
-        Start by selecting your language, chat with the model with text and images and provide feedback in different ways.
+            Start by selecting your language, chat with the model with text and images and provide feedback in different ways.
 
-        - ✏️ Edit a message
-        - 👍/👎 Like or dislike a message
-        - 🔄 Regenerate a message
+            - ✏️ Edit a message
+            - 👍/👎 Like or dislike a message
+            - 🔄 Regenerate a message
 
         Feedback is automatically submitted allowing you to continue chatting, but you can also submit and reset the conversation by clicking "💾 Submit conversation" (under the chat) or trash the conversation by clicking "🗑️" (upper right corner).
         """)
@@ -461,43 +520,54 @@ with gr.Blocks(css=css) as demo:
         add_button = gr.Button("", elem_id="add-language-btn")
         output = gr.Textbox(label="Status")
 
-    session_id = gr.Textbox(
-        interactive=False,
-        value=str(uuid.uuid4()),
-        visible=False,
+        session_id = gr.Textbox(
+            interactive=False,
+            value=str(uuid.uuid4()),
+            visible=False,
+        )
+
+        conversation_id = gr.Textbox(
+            interactive=False,
+            value=str(uuid.uuid4()),
+            visible=False,
+        )
+
+        chatbot = gr.Chatbot(
+            elem_id="chatbot",
+            editable="all",
+            bubble_full_width=False,
+            value=[
+                {
+                    "role": "system",
+                    "content": LANGUAGES[language.value],
+                }
+            ],
+            type="messages",
+            feedback_options=["Like", "Dislike"],
+        )
+
+        chat_input = gr.Textbox(
+            interactive=True,
+            placeholder="Enter message or upload file...",
+            show_label=False,
+            submit_btn=True,
+        )
+
+        with gr.Accordion("Collected feedback", open=False):
+            dataframe = gr.Dataframe(wrap=True, label="Collected feedback")
+
+        submit_btn = gr.Button(value="💾 Submit conversation", visible=False)
+
+    # Function to show main app after consent
+    def show_main_app():
+        return gr.Group(visible=False), gr.Group(visible=True), True
+
+    # Connect consent button to show main app
+    consent_btn.click(
+        fn=show_main_app,
+        inputs=[],
+        outputs=[landing_page, main_app, user_consented]
     )
-
-    conversation_id = gr.Textbox(
-        interactive=False,
-        value=str(uuid.uuid4()),
-        visible=False,
-    )
-
-    chatbot = gr.Chatbot(
-        elem_id="chatbot",
-        editable="all",
-        bubble_full_width=False,
-        value=[
-            {
-                "role": "system",
-                "content": LANGUAGES[language.value],
-            }
-        ],
-        type="messages",
-        feedback_options=["Like", "Dislike"],
-    )
-
-    chat_input = gr.Textbox(
-        interactive=True,
-        placeholder="Enter message or upload file...",
-        show_label=False,
-        submit_btn=True,
-    )
-
-    with gr.Accordion("Collected feedback", open=False):
-        dataframe = gr.Dataframe(wrap=True, label="Collected feedback")
-
-    submit_btn = gr.Button(value="💾 Submit conversation", visible=False)
 
     ##############################
     # Deal with feedback
@@ -561,6 +631,22 @@ with gr.Blocks(css=css) as demo:
         fn=on_app_load,
         inputs=None,
         outputs=session_id
+    )
+
+    add_language_btn.click(
+        fn=lambda: gr.Group(visible=True),
+        outputs=[add_language_modal]
+    )
+
+    cancel_language_btn.click(
+        fn=lambda: gr.Group(visible=False),
+        outputs=[add_language_modal]
+    )
+
+    save_language_btn.click(
+        fn=save_new_language,
+        inputs=[new_lang_name, new_system_prompt],
+        outputs=[add_language_modal, refresh_html, language]
     )
 
 demo.launch()
