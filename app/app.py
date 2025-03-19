@@ -6,6 +6,7 @@ from datetime import datetime
 from mimetypes import guess_type
 from pathlib import Path
 from typing import Optional
+import json
 
 import spaces
 import gradio as gr
@@ -89,15 +90,14 @@ def add_user_message(history, message):
 
 
 def format_system_message(language: str, history: list):
-    if history:
-        if history[0]["role"] == "system":
-            history = history[1:]
     system_message = [
         {
             "role": "system",
-            "content": LANGUAGES[language],
+            "content": LANGUAGES.get(language, LANGUAGES["English"]),
         }
     ]
+    if history and history[0]["role"] == "system":
+        history = history[1:]
     history = system_message + history
     return history
 
@@ -553,10 +553,14 @@ with gr.Blocks(css=css) as demo:
         outputs=[conversation_id],
     )
 
+    def on_app_load():
+        update_language_clients()
+        return str(uuid.uuid4())
+
     demo.load(
-        lambda: str(uuid.uuid4()),
-        inputs=[],
-        outputs=[session_id],
+        fn=on_app_load,
+        inputs=None,
+        outputs=session_id
     )
 
 demo.launch()
