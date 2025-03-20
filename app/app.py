@@ -9,6 +9,7 @@ from typing import Optional
 import json
 
 import spaces
+import spaces
 import gradio as gr
 from feedback import save_feedback, scheduler
 from gradio.components.chatbot import Option
@@ -17,24 +18,7 @@ from pandas import DataFrame
 from transformers import pipeline, AutoTokenizer, CohereForCausalLM
 
 
-LANGUAGES: dict[str, str] = {
-    "English": "You are a helpful assistant. Always respond to requests in fluent and natural English, regardless of the language used by the user.",
-    "Dutch": "Je bent een behulpzame assistent die uitsluitend in het Nederlands communiceert. Beantwoord alle vragen en verzoeken in vloeiend en natuurlijk Nederlands, ongeacht de taal waarin de gebruiker schrijft.",
-    "Italian": "Sei un assistente utile e rispondi sempre in italiano in modo naturale e fluente, indipendentemente dalla lingua utilizzata dall'utente.",
-    "Spanish": "Eres un asistente útil que siempre responde en español de manera fluida y natural, independientemente del idioma utilizado por el usuario.",
-    "French": "Tu es un assistant utile qui répond toujours en français de manière fluide et naturelle, quelle que soit la langue utilisée par l'utilisateur.",
-    "German": "Du bist ein hilfreicher Assistent, der stets auf Deutsch in einer natürlichen und fließenden Weise antwortet, unabhängig von der Sprache des Benutzers.",
-    "Portuguese": "Você é um assistente útil que sempre responde em português de forma natural e fluente, independentemente do idioma utilizado pelo usuário.",
-    "Russian": "Ты полезный помощник, который всегда отвечает на русском языке плавно и естественно, независимо от языка пользователя.",
-    "Chinese": "你是一个有用的助手，总是用流畅自然的中文回答问题，无论用户使用哪种语言。",
-    "Japanese": "あなたは役に立つアシスタントであり、常に流暢で自然な日本語で応答します。ユーザーが使用する言語に関係なく、日本語で対応してください。",
-    "Korean": "당신은 유용한 도우미이며, 항상 유창하고 자연스러운 한국어로 응답합니다. 사용자가 어떤 언어를 사용하든 한국어로 대답하세요.",
-    "Hebrew": " אתה עוזר טוב ומועיל שמדבר בעברית ועונה בעברית.",
-    "Hindi" : "आप एक मददगार सहायक हैं। उपयोगकर्ता द्वारा इस्तेमाल की गई भाषा की परवाह किए बिना हमेशा धाराप्रवाह और स्वाभाविक अंग्रेजी में अनुरोधों का जवाब दें।"
-}
-
-
-BASE_MODEL = os.getenv("MODEL", "meta-llama/Llama-3.2-11B-Vision-Instruct")
+BASE_MODEL = os.getenv("MODEL", "CohereForAI/aya-expanse-8b")
 ZERO_GPU = (
     bool(os.getenv("ZERO_GPU", False)) or True
     if str(os.getenv("ZERO_GPU")).lower() == "true"
@@ -52,6 +36,7 @@ def create_inference_client(
 ) -> InferenceClient:
     """Create an InferenceClient instance with the given model or environment settings.
     This function will run the model locally if ZERO_GPU is set to True.
+    This function will run the model locally if ZERO_GPU is set to True.
 
     Args:
         model: Optional model identifier to use. If not provided, will use environment settings.
@@ -62,17 +47,24 @@ def create_inference_client(
     if ZERO_GPU:
         tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
         model = CohereForCausalLM.from_pretrained(BASE_MODEL, load_in_8bit=True)
-        return pipeline(
-            "text-generation",
-            model=model,
-            tokenizer=tokenizer,
-        )
+        return {
+            "pipeline": pipeline(
+                "text-generation",
+                model=model,
+                tokenizer=tokenizer,
+                max_new_tokens=2000,
+            ),
+            "tokenizer": tokenizer
+        }
     else:
         return InferenceClient(
             token=os.getenv("HF_TOKEN"),
             model=model if model else (BASE_MODEL if not base_url else None),
             base_url=base_url,
         )
+
+
+CLIENT = create_inference_client()
 
 
 def load_languages() -> dict[str, str]:
@@ -148,7 +140,7 @@ You have been asked to participate in a research study conducted by Lingo Lab fr
 
 The purpose of this study is the collection of multilingual human feedback to improve language models. As part of this study you will interat with a language model in a langugage of your choice, and provide indication to wether its reponses are helpful or not.
 
-Your name and personal data will never be recorded. You may decline further participation, at any time, without adverse consequences.There are no foreseeable risks or discomforts for participating in this study. Note participating in the study may pose risks that are currently unforeseeable. If you have questions or concerns about the study, you can contact the researchers at XXX. If you have any questions about your rights as a participant in this research (E-6610), feel you have been harmed, or wish to discuss other study-related concerns with someone who is not part of the research team, you can contact the M.I.T. Committee on the Use of Humans as Experimental Subjects (COUHES) by phone at (617) 253-8420, or by email at couhes@mit.edu.
+Your name and personal data will never be recorded. You may decline further participation, at any time, without adverse consequences.There are no foreseeable risks or discomforts for participating in this study. Note participating in the study may pose risks that are currently unforeseeable. If you have questions or concerns about the study, you can contact the researchers at leshem@mit.edu. If you have any questions about your rights as a participant in this research (E-6610), feel you have been harmed, or wish to discuss other study-related concerns with someone who is not part of the research team, you can contact the M.I.T. Committee on the Use of Humans as Experimental Subjects (COUHES) by phone at (617) 253-8420, or by email at couhes@mit.edu.
 
 Clicking on the next button at the bottom of this page indicates that you are at least 18 years of age and willingly agree to participate in the research voluntarily.
 """
@@ -182,6 +174,11 @@ def format_history_as_messages(history: list):
     messages = []
     current_role = None
     current_message_content = []
+
+    if TEXT_ONLY:
+        for entry in history:
+            messages.append({"role": entry["role"], "content": entry["content"]})
+        return messages
 
     if TEXT_ONLY:
         for entry in history:
@@ -274,13 +271,33 @@ def add_fake_like_data(
 
 @spaces.GPU
 def call_pipeline(messages: list, language: str):
-    response = CLIENT(
-        messages,
-        clean_up_tokenization_spaces=False,
-        max_length=2000,
-    )
-    content = response[0]["generated_text"][-1]["content"]
-    return content
+    if ZERO_GPU:
+        # Format the messages using the tokenizer's chat template
+        tokenizer = CLIENT["tokenizer"]
+        formatted_prompt = tokenizer.apply_chat_template(
+            messages, 
+            tokenize=False, 
+        )
+        
+        # Call the pipeline with the formatted text
+        response = CLIENT["pipeline"](
+            formatted_prompt,
+            clean_up_tokenization_spaces=False,
+            max_length=2000,
+            return_full_text=False,
+        )
+        
+        # Extract the generated content
+        content = response[0]["generated_text"]
+        return content
+    else:
+        response = CLIENT(
+            messages,
+            clean_up_tokenization_spaces=False,
+            max_length=2000,
+        )
+        content = response[0]["generated_text"][-1]["content"]
+        return content
 
 
 def respond(
@@ -293,6 +310,17 @@ def respond(
 
     Return the history with the new message"""
     messages = format_history_as_messages(history)
+    if ZERO_GPU:
+        content = call_pipeline(messages, language)
+    else:
+        response = CLIENT.chat.completions.create(
+            messages=messages,
+            max_tokens=2000,
+            stream=False,
+            seed=seed,
+            temperature=temperature,
+        )
+        content = response.choices[0].message.content
     if ZERO_GPU:
         content = call_pipeline(messages, language)
     else:
