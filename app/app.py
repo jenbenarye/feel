@@ -15,7 +15,7 @@ from feedback import save_feedback, scheduler
 from gradio.components.chatbot import Option
 from huggingface_hub import InferenceClient
 from pandas import DataFrame
-from transformers import pipeline, AutoTokenizer, CohereForCausalLM
+from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
 
 
 BASE_MODEL = os.getenv("MODEL", "CohereForAI/aya-expanse-8b")
@@ -46,7 +46,7 @@ def create_inference_client(
     """
     if ZERO_GPU:
         tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
-        model = CohereForCausalLM.from_pretrained(BASE_MODEL, load_in_8bit=True)
+        model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, load_in_8bit=True)
         return {
             "pipeline": pipeline(
                 "text-generation",
@@ -116,23 +116,9 @@ def load_languages() -> dict[str, str]:
     with open(languages_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def update_language_clients():
-    """Update the global LANGUAGES and LANGUAGES_TO_CLIENT dictionaries"""
-    global LANGUAGES, LANGUAGES_TO_CLIENT
-    LANGUAGES = load_languages()
-    # Create new clients for any new languages
-    for lang in LANGUAGES.keys():
-        if lang not in LANGUAGES_TO_CLIENT:
-            LANGUAGES_TO_CLIENT[lang] = create_inference_client()
-    # Remove clients for languages that no longer exist
-    for lang in list(LANGUAGES_TO_CLIENT.keys()):
-        if lang not in LANGUAGES:
-            del LANGUAGES_TO_CLIENT[lang]
 
 # Initial load
-LANGUAGES = {}
-LANGUAGES_TO_CLIENT = {}
-update_language_clients()
+LANGUAGES = load_languages()
 
 # User agreement text
 USER_AGREEMENT = """
@@ -564,9 +550,6 @@ def save_new_language(lang_name, system_prompt):
         except Exception as e:
             print(f"Error updating local backup: {e}")
     
-    # Update the in-memory language dictionaries
-    update_language_clients()
-    
     # Update the dropdown choices
     new_choices = list(LANGUAGES.keys())
     
@@ -619,7 +602,7 @@ with gr.Blocks(css=css) as demo:
         gr.Markdown("# Welcome to FeeL")
         with gr.Group(elem_classes=["user-agreement-container"]):
             gr.Markdown(USER_AGREEMENT)
-        consent_btn = gr.Button("Next")
+        consent_btn = gr.Button("I agree")
     
     # Main application interface (initially hidden)
     with gr.Group(visible=False) as main_app:
@@ -765,7 +748,6 @@ with gr.Blocks(css=css) as demo:
     )
 
     def on_app_load():
-        update_language_clients()
         return str(uuid.uuid4())
 
     demo.load(
