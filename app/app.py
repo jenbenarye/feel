@@ -564,18 +564,23 @@ button#add-language-btn {
 }
 /* Style for the user agreement container */
 .user-agreement-container {
-    background-color: white !important;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1) !important;
 }
-/* Ensure the markdown inside the container inherits the background */
-.user-agreement-container > div {
-    background-color: white !important;
-}
-/* Target all elements inside the container */
-.user-agreement-container * {
-    background-color: white !important;
-}
 """
+# /* Style for the user agreement container */
+# .user-agreement-container {
+#     background-color: white !important;
+#     box-shadow: 0 2px 5px rgba(0,0,0,0.1) !important;
+# }
+# /* Ensure the markdown inside the container inherits the background */
+# .user-agreement-container > div {
+#     background-color: white !important;
+# }
+# /* Target all elements inside the container */
+# .user-agreement-container * {
+#     background-color: white !important;
+# }
+# """
 
 with gr.Blocks(css=css) as demo:
     # State variable to track if user has consented
