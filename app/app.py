@@ -75,7 +75,83 @@ def create_inference_client(
         )
 
 
-CLIENT = create_inference_client()
+def load_languages() -> dict[str, str]:
+    """Load languages from JSON file or persistent storage"""
+    # First check if we have persistent storage available
+    persistent_path = Path("/data/languages.json")
+    local_path = Path(__file__).parent / "languages.json"
+    
+    # Check if persistent storage is available and writable
+    use_persistent = False
+    if Path("/data").exists() and Path("/data").is_dir():
+        try:
+            # Test if we can write to the directory
+            test_file = Path("/data/write_test.tmp")
+            test_file.touch()
+            test_file.unlink()  # Remove the test file
+            use_persistent = True
+        except (PermissionError, OSError):
+            print("Persistent storage exists but is not writable, falling back to local storage")
+            use_persistent = False
+    
+    # Use persistent storage if available and writable, otherwise fall back to local file
+    if use_persistent and persistent_path.exists():
+        languages_path = persistent_path
+    else:
+        languages_path = local_path
+        
+        # If persistent storage is available and writable but file doesn't exist yet,
+        # copy the local file to persistent storage
+        if use_persistent:
+            try:
+                # Ensure local file exists first
+                if local_path.exists():
+                    import shutil
+                    # Copy the file to persistent storage
+                    shutil.copy(local_path, persistent_path)
+                    languages_path = persistent_path
+                    print(f"Copied languages to persistent storage at {persistent_path}")
+                else:
+                    # Create an empty languages file in persistent storage
+                    with open(persistent_path, "w", encoding="utf-8") as f:
+                        json.dump({"English": "You are a helpful assistant."}, f, ensure_ascii=False, indent=2)
+                    languages_path = persistent_path
+                    print(f"Created new languages file in persistent storage at {persistent_path}")
+            except Exception as e:
+                print(f"Error setting up persistent storage: {e}")
+                languages_path = local_path  # Fall back to local path if any error occurs
+    
+    with open(languages_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def update_language_clients():
+    """Update the global LANGUAGES and LANGUAGES_TO_CLIENT dictionaries"""
+    global LANGUAGES, LANGUAGES_TO_CLIENT
+    LANGUAGES = load_languages()
+    # Create new clients for any new languages
+    for lang in LANGUAGES.keys():
+        if lang not in LANGUAGES_TO_CLIENT:
+            LANGUAGES_TO_CLIENT[lang] = create_inference_client()
+    # Remove clients for languages that no longer exist
+    for lang in list(LANGUAGES_TO_CLIENT.keys()):
+        if lang not in LANGUAGES:
+            del LANGUAGES_TO_CLIENT[lang]
+
+# Initial load
+LANGUAGES = {}
+LANGUAGES_TO_CLIENT = {}
+update_language_clients()
+
+# User agreement text
+USER_AGREEMENT = """
+You have been asked to participate in a research study conducted by Lingo Lab from the Computer Science and Artificial Intelligence Laboratory at the Massachusetts Institute of Technology (M.I.T.), together with huggingface. 
+
+The purpose of this study is the collection of multilingual human feedback to improve language models. As part of this study you will interat with a language model in a langugage of your choice, and provide indication to wether its reponses are helpful or not.
+
+Your name and personal data will never be recorded. You may decline further participation, at any time, without adverse consequences.There are no foreseeable risks or discomforts for participating in this study. Note participating in the study may pose risks that are currently unforeseeable. If you have questions or concerns about the study, you can contact the researchers at XXX. If you have any questions about your rights as a participant in this research (E-6610), feel you have been harmed, or wish to discuss other study-related concerns with someone who is not part of the research team, you can contact the M.I.T. Committee on the Use of Humans as Experimental Subjects (COUHES) by phone at (617) 253-8420, or by email at couhes@mit.edu.
+
+Clicking on the next button at the bottom of this page indicates that you are at least 18 years of age and willingly agree to participate in the research voluntarily.
+"""
 
 
 def add_user_message(history, message):
@@ -417,16 +493,48 @@ def close_add_language_modal():
     return gr.Group(visible=False)
 
 def save_new_language(lang_name, system_prompt):
-    """Save the new language and system prompt to languages.json, then refresh the page."""
-    languages_path = Path(__file__).parent / "languages.json"
-    with open(languages_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
+    """Save the new language and system prompt to persistent storage if available, otherwise to local file."""
+    # First determine where to save the file
+    persistent_path = Path("/data/languages.json")
+    local_path = Path(__file__).parent / "languages.json"
+    
+    # Check if persistent storage is available and writable
+    use_persistent = False
+    if Path("/data").exists() and Path("/data").is_dir():
+        try:
+            # Test if we can write to the directory
+            test_file = Path("/data/write_test.tmp")
+            test_file.touch()
+            test_file.unlink()  # Remove the test file
+            use_persistent = True
+        except (PermissionError, OSError):
+            print("Persistent storage exists but is not writable, falling back to local storage")
+            use_persistent = False
+    
+    # Use persistent storage if available and writable, otherwise fall back to local file
+    languages_path = persistent_path if use_persistent else local_path
+    
+    # Load existing languages
+    if languages_path.exists():
+        with open(languages_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        data = {}
+    
     # Add the new language to JSON
     data[lang_name] = system_prompt
 
+    # Save the updated languages
     with open(languages_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+    
+    # If we're using persistent storage, also update the local file as backup
+    if use_persistent and local_path != persistent_path:
+        try:
+            with open(local_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Error updating local backup: {e}")
     
     # Update the in-memory language dictionaries
     update_language_clients()
