@@ -508,6 +508,8 @@ def close_add_language_modal():
 
 def save_new_language(lang_name, system_prompt):
     """Save the new language and system prompt to persistent storage if available, otherwise to local file."""
+    global LANGUAGES  # Access the global variable
+    
     # First determine where to save the file
     persistent_path = Path("/data/languages.json")
     local_path = Path(__file__).parent / "languages.json"
@@ -549,6 +551,9 @@ def save_new_language(lang_name, system_prompt):
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"Error updating local backup: {e}")
+    
+    # Update the global LANGUAGES variable with the new data
+    LANGUAGES.update({lang_name: system_prompt})
     
     # Update the dropdown choices
     new_choices = list(LANGUAGES.keys())
@@ -625,24 +630,39 @@ with gr.Blocks(css=css) as demo:
             - 👍/👎 Like or dislike a message
             - 🔄 Regenerate a message
 
-        Feedback is automatically submitted allowing you to continue chatting, but you can also submit and reset the conversation by clicking "💾 Submit conversation" (under the chat) or trash the conversation by clicking "🗑️" (upper right corner).
-        """)
-        language = gr.Dropdown(
-            choices=list(LANGUAGES.keys()), label="Language", interactive=True
-        )
+            """)
 
-    with gr.Blocks(css="""
-    #add-language-btn {
-        background: url('os.path.abspath("app/feel-add-icon.png")') no-repeat center;
-        background-size: contain;
-        width: 50px;
-        height: 50px;
-        border: none;
-        cursor: pointer;
-    }
-""") as demo:
-        add_button = gr.Button("", elem_id="add-language-btn")
-        output = gr.Textbox(label="Status")
+            with gr.Column():
+                gr.Markdown("Select your language or add a new one:")
+                with gr.Row():
+                    language = gr.Dropdown(
+                        choices=list(load_languages().keys()),
+                        container=False,
+                        show_label=False,
+                        scale=8
+                    )
+                    add_language_btn = gr.Button(
+                        "+", 
+                        elem_id="add-language-btn",
+                        size="sm"
+                    )
+
+
+        # Create a hidden group instead of a modal
+        with gr.Group(visible=False) as add_language_modal:
+            gr.Markdown("&nbsp;Add New Language")
+            new_lang_name = gr.Textbox(label="Language Name", lines=1)
+            new_system_prompt = gr.Textbox(label="System Prompt", lines=4)
+            with gr.Row():
+                with gr.Column(scale=1):
+                    save_language_btn = gr.Button("Save")
+                # with gr.Column(scale=0.2):
+                #     pass  # Empty column as spacer
+                with gr.Column(scale=1):
+                    cancel_language_btn = gr.Button("Cancel")
+
+        # Add a hidden HTML component for page refresh
+        refresh_html = gr.HTML(visible=False)
 
         session_id = gr.Textbox(
             interactive=False,
@@ -748,12 +768,20 @@ with gr.Blocks(css=css) as demo:
     )
 
     def on_app_load():
-        return str(uuid.uuid4())
+        global LANGUAGES
+        # Force reload languages from file
+        LANGUAGES = load_languages()
+        
+        # Get the list of languages
+        language_choices = list(LANGUAGES.keys())
+        
+        # Return both the session ID and available language choices
+        return str(uuid.uuid4()), gr.Dropdown(choices=language_choices, value=language_choices[0])
 
     demo.load(
         fn=on_app_load,
         inputs=None,
-        outputs=session_id
+        outputs=[session_id, language]
     )
 
     add_language_btn.click(
