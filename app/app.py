@@ -49,6 +49,7 @@ def create_inference_client(
     model: Optional[str] = None, base_url: Optional[str] = None
 ) -> InferenceClient:
     """Create an InferenceClient instance with the given model or environment settings.
+    This function will run the model locally if ZERO_GPU is set to True.
 
     Args:
         model: Optional model identifier to use. If not provided, will use environment settings.
