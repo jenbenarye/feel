@@ -33,16 +33,17 @@ TEXT_ONLY = (
 
 def create_inference_client(
     model: Optional[str] = None, base_url: Optional[str] = None
-) -> InferenceClient:
+) -> InferenceClient | dict:
     """Create an InferenceClient instance with the given model or environment settings.
     This function will run the model locally if ZERO_GPU is set to True.
     This function will run the model locally if ZERO_GPU is set to True.
 
     Args:
         model: Optional model identifier to use. If not provided, will use environment settings.
+        base_url: Optional base URL for the inference API.
 
     Returns:
-        InferenceClient: Configured client instance
+        Either an InferenceClient instance or a dictionary with pipeline and tokenizer
     """
     if ZERO_GPU:
         tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
@@ -67,11 +68,17 @@ def create_inference_client(
 CLIENT = create_inference_client()
 
 
-def load_languages() -> dict[str, str]:
-    """Load languages from JSON file or persistent storage"""
-    # First check if we have persistent storage available
-    persistent_path = Path("/data/languages.json")
-    local_path = Path(__file__).parent / "languages.json"
+def get_persistent_storage_path(filename: str) -> tuple[Path, bool]:
+    """Check if persistent storage is available and return the appropriate path.
+    
+    Args:
+        filename: The name of the file to check/create
+        
+    Returns:
+        A tuple containing (file_path, is_persistent)
+    """
+    persistent_path = Path("/data") / filename
+    local_path = Path(__file__).parent / filename
     
     # Check if persistent storage is available and writable
     use_persistent = False
@@ -86,35 +93,44 @@ def load_languages() -> dict[str, str]:
             print("Persistent storage exists but is not writable, falling back to local storage")
             use_persistent = False
     
-    # Use persistent storage if available and writable, otherwise fall back to local file
-    if use_persistent and persistent_path.exists():
-        languages_path = persistent_path
-    else:
-        languages_path = local_path
-        
-        # If persistent storage is available and writable but file doesn't exist yet,
-        # copy the local file to persistent storage
-        if use_persistent:
-            try:
-                # Ensure local file exists first
-                if local_path.exists():
-                    import shutil
-                    # Copy the file to persistent storage
-                    shutil.copy(local_path, persistent_path)
-                    languages_path = persistent_path
-                    print(f"Copied languages to persistent storage at {persistent_path}")
-                else:
-                    # Create an empty languages file in persistent storage
-                    with open(persistent_path, "w", encoding="utf-8") as f:
-                        json.dump({"English": "You are a helpful assistant."}, f, ensure_ascii=False, indent=2)
-                    languages_path = persistent_path
-                    print(f"Created new languages file in persistent storage at {persistent_path}")
-            except Exception as e:
-                print(f"Error setting up persistent storage: {e}")
-                languages_path = local_path  # Fall back to local path if any error occurs
+    return (persistent_path if use_persistent else local_path, use_persistent)
+
+
+def load_languages() -> dict[str, str]:
+    """Load languages from JSON file or persistent storage"""
+    languages_path, use_persistent = get_persistent_storage_path("languages.json")
+    local_path = Path(__file__).parent / "languages.json"
     
-    with open(languages_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    # If persistent storage is available but file doesn't exist yet,
+    # copy the local file to persistent storage
+    if use_persistent and not languages_path.exists():
+        try:
+            if local_path.exists():
+                import shutil
+                # Copy the file to persistent storage
+                shutil.copy(local_path, languages_path)
+                print(f"Copied languages to persistent storage at {languages_path}")
+            else:
+                # Create an empty languages file in persistent storage
+                with open(languages_path, "w", encoding="utf-8") as f:
+                    json.dump({"English": "You are a helpful assistant."}, f, ensure_ascii=False, indent=2)
+                print(f"Created new languages file in persistent storage at {languages_path}")
+        except Exception as e:
+            print(f"Error setting up persistent storage: {e}")
+            languages_path = local_path  # Fall back to local path if any error occurs
+    
+    # If the file doesn't exist at the chosen path but exists at the local path, use local
+    if not languages_path.exists() and local_path.exists():
+        languages_path = local_path
+    
+    # If the file exists, load it
+    if languages_path.exists():
+        with open(languages_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    else:
+        # Return a default if no file exists
+        default_languages = {"English": "You are a helpful assistant."}
+        return default_languages
 
 
 # Initial load
@@ -257,6 +273,7 @@ def add_fake_like_data(
 
 @spaces.GPU
 def call_pipeline(messages: list, language: str):
+    """Call the appropriate model pipeline based on configuration"""
     if ZERO_GPU:
         # Format the messages using the tokenizer's chat template
         tokenizer = CLIENT["tokenizer"]
@@ -274,16 +291,14 @@ def call_pipeline(messages: list, language: str):
         )
         
         # Extract the generated content
-        content = response[0]["generated_text"]
-        return content
+        return response[0]["generated_text"]
     else:
         response = CLIENT(
             messages,
             clean_up_tokenization_spaces=False,
             max_length=2000,
         )
-        content = response[0]["generated_text"][-1]["content"]
-        return content
+        return response[0]["generated_text"][-1]["content"]
 
 
 def respond(
@@ -291,11 +306,12 @@ def respond(
     language: str,
     temperature: Optional[float] = None,
     seed: Optional[int] = None,
-) -> list:  # -> list:
+) -> list:
     """Respond to the user message with a system message
 
     Return the history with the new message"""
     messages = format_history_as_messages(history)
+    
     if ZERO_GPU:
         content = call_pipeline(messages, language)
     else:
@@ -307,17 +323,7 @@ def respond(
             temperature=temperature,
         )
         content = response.choices[0].message.content
-    if ZERO_GPU:
-        content = call_pipeline(messages, language)
-    else:
-        response = CLIENT.chat.completions.create(
-            messages=messages,
-            max_tokens=2000,
-            stream=False,
-            seed=seed,
-            temperature=temperature,
-        )
-        content = response.choices[0].message.content
+        
     message = gr.ChatMessage(role="assistant", content=content)
     history.append(message)
     return history
@@ -510,25 +516,9 @@ def save_new_language(lang_name, system_prompt):
     """Save the new language and system prompt to persistent storage if available, otherwise to local file."""
     global LANGUAGES  # Access the global variable
     
-    # First determine where to save the file
-    persistent_path = Path("/data/languages.json")
+    # Get the appropriate path
+    languages_path, use_persistent = get_persistent_storage_path("languages.json")
     local_path = Path(__file__).parent / "languages.json"
-    
-    # Check if persistent storage is available and writable
-    use_persistent = False
-    if Path("/data").exists() and Path("/data").is_dir():
-        try:
-            # Test if we can write to the directory
-            test_file = Path("/data/write_test.tmp")
-            test_file.touch()
-            test_file.unlink()  # Remove the test file
-            use_persistent = True
-        except (PermissionError, OSError):
-            print("Persistent storage exists but is not writable, falling back to local storage")
-            use_persistent = False
-    
-    # Use persistent storage if available and writable, otherwise fall back to local file
-    languages_path = persistent_path if use_persistent else local_path
     
     # Load existing languages
     if languages_path.exists():
@@ -545,7 +535,7 @@ def save_new_language(lang_name, system_prompt):
         json.dump(data, f, ensure_ascii=False, indent=2)
     
     # If we're using persistent storage, also update the local file as backup
-    if use_persistent and local_path != persistent_path:
+    if use_persistent and local_path != languages_path:
         try:
             with open(local_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
@@ -555,11 +545,8 @@ def save_new_language(lang_name, system_prompt):
     # Update the global LANGUAGES variable with the new data
     LANGUAGES.update({lang_name: system_prompt})
     
-    # Update the dropdown choices
-    new_choices = list(LANGUAGES.keys())
-    
     # Return a message that will trigger a JavaScript refresh
-    return gr.Group(visible=False), gr.HTML("<script>window.location.reload();</script>"), gr.Dropdown(choices=new_choices)
+    return gr.Group(visible=False), gr.HTML("<script>window.location.reload();</script>"), gr.Dropdown(choices=list(LANGUAGES.keys()))
 
 
 css = """
