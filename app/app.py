@@ -29,6 +29,7 @@ LANGUAGES: dict[str, str] = {
     "Japanese": "あなたは役に立つアシスタントであり、常に流暢で自然な日本語で応答します。ユーザーが使用する言語に関係なく、日本語で対応してください。",
     "Korean": "당신은 유용한 도우미이며, 항상 유창하고 자연스러운 한국어로 응답합니다. 사용자가 어떤 언어를 사용하든 한국어로 대답하세요.",
     "Hebrew": " אתה עוזר טוב ומועיל שמדבר בעברית ועונה בעברית.",
+    "Hindi" : "आप एक मददगार सहायक हैं। उपयोगकर्ता द्वारा इस्तेमाल की गई भाषा की परवाह किए बिना हमेशा धाराप्रवाह और स्वाभाविक अंग्रेजी में अनुरोधों का जवाब दें।"
 }
 
 
@@ -446,6 +447,19 @@ with gr.Blocks(css=css) as demo:
         language = gr.Dropdown(
             choices=list(LANGUAGES.keys()), label="Language", interactive=True
         )
+
+    with gr.Blocks(css="""
+    #add-language-btn {
+        background: url('os.path.abspath("app/feel-add-icon.png")') no-repeat center;
+        background-size: contain;
+        width: 50px;
+        height: 50px;
+        border: none;
+        cursor: pointer;
+    }
+""") as demo:
+        add_button = gr.Button("", elem_id="add-language-btn")
+        output = gr.Textbox(label="Status")
 
     session_id = gr.Textbox(
         interactive=False,
