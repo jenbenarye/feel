@@ -448,8 +448,18 @@ with gr.Blocks(css=css) as demo:
             choices=list(LANGUAGES.keys()), label="Language", interactive=True
         )
 
-    add_button = gr.Button("-", elem_id="add-language-btn")
-    output = gr.Textbox(label="Status")
+    with gr.Blocks(css="""
+    #add-language-btn {
+        background: url('os.path.abspath("app/feel-add-icon.png")') no-repeat center;
+        background-size: contain;
+        width: 50px;
+        height: 50px;
+        border: none;
+        cursor: pointer;
+    }
+""") as demo:
+        add_button = gr.Button("", elem_id="add-language-btn")
+        output = gr.Textbox(label="Status")
 
     session_id = gr.Textbox(
         interactive=False,
