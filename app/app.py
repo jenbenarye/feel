@@ -448,6 +448,9 @@ with gr.Blocks(css=css) as demo:
             choices=list(LANGUAGES.keys()), label="Language", interactive=True
         )
 
+    add_button = gr.Button("-", elem_id="add-language-btn")
+    output = gr.Textbox(label="Status")
+
     session_id = gr.Textbox(
         interactive=False,
         value=str(uuid.uuid4()),
