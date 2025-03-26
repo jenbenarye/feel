@@ -101,17 +101,14 @@ def load_languages() -> dict[str, str]:
     languages_path, use_persistent = get_persistent_storage_path("languages.json")
     local_path = Path(__file__).parent / "languages.json"
     
-    # If persistent storage is available but file doesn't exist yet,
-    # copy the local file to persistent storage
+    # If persistent storage is available but file doesn't exist yet, copy the local file to persistent storage
     if use_persistent and not languages_path.exists():
         try:
             if local_path.exists():
                 import shutil
-                # Copy the file to persistent storage
                 shutil.copy(local_path, languages_path)
                 print(f"Copied languages to persistent storage at {languages_path}")
             else:
-                # Create an empty languages file in persistent storage
                 with open(languages_path, "w", encoding="utf-8") as f:
                     json.dump({"English": "You are a helpful assistant."}, f, ensure_ascii=False, indent=2)
                 print(f"Created new languages file in persistent storage at {languages_path}")
@@ -119,24 +116,18 @@ def load_languages() -> dict[str, str]:
             print(f"Error setting up persistent storage: {e}")
             languages_path = local_path  # Fall back to local path if any error occurs
     
-    # If the file doesn't exist at the chosen path but exists at the local path, use local
     if not languages_path.exists() and local_path.exists():
         languages_path = local_path
     
-    # If the file exists, load it
     if languages_path.exists():
         with open(languages_path, "r", encoding="utf-8") as f:
             return json.load(f)
     else:
-        # Return a default if no file exists
         default_languages = {"English": "You are a helpful assistant."}
         return default_languages
 
-
-# Initial load
 LANGUAGES = load_languages()
 
-# User agreement text
 USER_AGREEMENT = """
 You have been asked to participate in a research study conducted by Lingo Lab from the Computer Science and Artificial Intelligence Laboratory at the Massachusetts Institute of Technology (M.I.T.), together with huggingface. 
 
@@ -275,14 +266,12 @@ def add_fake_like_data(
 def call_pipeline(messages: list, language: str):
     """Call the appropriate model pipeline based on configuration"""
     if ZERO_GPU:
-        # Format the messages using the tokenizer's chat template
         tokenizer = CLIENT["tokenizer"]
         formatted_prompt = tokenizer.apply_chat_template(
             messages, 
             tokenize=False, 
         )
         
-        # Call the pipeline with the formatted text
         response = CLIENT["pipeline"](
             formatted_prompt,
             clean_up_tokenization_spaces=False,
@@ -290,7 +279,6 @@ def call_pipeline(messages: list, language: str):
             return_full_text=False,
         )
         
-        # Extract the generated content
         return response[0]["generated_text"]
     else:
         response = CLIENT(
@@ -435,7 +423,6 @@ def wrangle_edit_data(
         )
         return history
     else:
-        # Add feedback on original and corrected message
         add_fake_like_data(
             history=history[: index + 1],
             conversation_id=conversation_id,
@@ -450,7 +437,6 @@ def wrangle_edit_data(
             language=language,
         )
         history = history[: index + 1]
-        # add chosen and rejected options
         history[-1]["options"] = [
             Option(label="chosen", value=x.value),
             Option(label="rejected", value=original_message["content"]),
@@ -514,27 +500,22 @@ def close_add_language_modal():
 
 def save_new_language(lang_name, system_prompt):
     """Save the new language and system prompt to persistent storage if available, otherwise to local file."""
-    global LANGUAGES  # Access the global variable
+    global LANGUAGES  
     
-    # Get the appropriate path
     languages_path, use_persistent = get_persistent_storage_path("languages.json")
     local_path = Path(__file__).parent / "languages.json"
     
-    # Load existing languages
     if languages_path.exists():
         with open(languages_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     else:
         data = {}
     
-    # Add the new language to JSON
     data[lang_name] = system_prompt
 
-    # Save the updated languages
     with open(languages_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     
-    # If we're using persistent storage, also update the local file as backup
     if use_persistent and local_path != languages_path:
         try:
             with open(local_path, "w", encoding="utf-8") as f:
@@ -542,10 +523,7 @@ def save_new_language(lang_name, system_prompt):
         except Exception as e:
             print(f"Error updating local backup: {e}")
     
-    # Update the global LANGUAGES variable with the new data
     LANGUAGES.update({lang_name: system_prompt})
-    
-    # Return a message that will trigger a JavaScript refresh
     return gr.Group(visible=False), gr.HTML("<script>window.location.reload();</script>"), gr.Dropdown(choices=list(LANGUAGES.keys()))
 
 
@@ -570,20 +548,6 @@ button#add-language-btn {
     box-shadow: 0 2px 5px rgba(0,0,0,0.1) !important;
 }
 """
-# /* Style for the user agreement container */
-# .user-agreement-container {
-#     background-color: white !important;
-#     box-shadow: 0 2px 5px rgba(0,0,0,0.1) !important;
-# }
-# /* Ensure the markdown inside the container inherits the background */
-# .user-agreement-container > div {
-#     background-color: white !important;
-# }
-# /* Target all elements inside the container */
-# .user-agreement-container * {
-#     background-color: white !important;
-# }
-# """
 
 with gr.Blocks(css=css) as demo:
     # State variable to track if user has consented
@@ -643,12 +607,9 @@ with gr.Blocks(css=css) as demo:
             with gr.Row():
                 with gr.Column(scale=1):
                     save_language_btn = gr.Button("Save")
-                # with gr.Column(scale=0.2):
-                #     pass  # Empty column as spacer
                 with gr.Column(scale=1):
                     cancel_language_btn = gr.Button("Cancel")
 
-        # Add a hidden HTML component for page refresh
         refresh_html = gr.HTML(visible=False)
 
         session_id = gr.Textbox(
@@ -756,13 +717,9 @@ with gr.Blocks(css=css) as demo:
 
     def on_app_load():
         global LANGUAGES
-        # Force reload languages from file
         LANGUAGES = load_languages()
-        
-        # Get the list of languages
         language_choices = list(LANGUAGES.keys())
         
-        # Return both the session ID and available language choices
         return str(uuid.uuid4()), gr.Dropdown(choices=language_choices, value=language_choices[0])
 
     demo.load(
