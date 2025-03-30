@@ -585,6 +585,33 @@ button#add-language-btn {
 def get_config(request: gr.Request):
     """Get configuration from cookies"""
     config = {"feel_consent": False}
+    if request and 'feel_consent' in request.cookies:
+        config["feel_consent"] = request.cookies['feel_consent'] == 'true'
+    return config["feel_consent"]
+
+js = '''function js(){
+    window.set_cookie = function(key, value){
+        // Use a longer expiry and more complete cookie setting
+        const d = new Date();
+        d.setTime(d.getTime() + (365*24*60*60*1000));
+        document.cookie = key + "=" + value + ";path=/;expires=" + d.toUTCString() + ";SameSite=Lax";
+        return value === 'true';  // Return boolean directly
+    }
+    
+    window.check_cookie = function(key){
+        const value = document.cookie
+            .split('; ')
+            .find(row => row.startsWith(key + '='))
+            ?.split('=')[1];
+        return value === 'true';  // Return boolean directly
+    }
+}'''
+
+
+
+with gr.Blocks(css=css, js=js) as demo:
+    # State variable to track if user has consented
+    user_consented = gr.State(value=False)  
     
     if request and hasattr(request, 'cookies'):
         for key in config.keys():
@@ -702,49 +729,38 @@ with gr.Blocks(css=css, js=js) as demo:
 
         submit_btn = gr.Button(value="💾 Submit conversation", visible=False)
 
-    # Overlay for the consent modal
-    with gr.Group(elem_classes=["modal-overlay"], visible=False) as consent_overlay:
-        pass
-        
-    # Consent popup
-    with gr.Group(elem_classes=["consent-modal"], visible=False) as consent_modal:
-        gr.Markdown("# User Agreement")
-        with gr.Group(elem_classes=["user-agreement-container"]):
-            gr.Markdown(USER_AGREEMENT)
-        consent_btn = gr.Button("I agree")
-
-    # Check consent on page load and show/hide components appropriately
-    def initialize_consent_status():
-        # This function will be called when the app loads
-        return False  # Default to not consented
-    
-    def update_visibility(has_consent):
-        # Show/hide components based on consent status
-        return (
-            gr.Group(visible=True),  # main_app
-            gr.Group(visible=not has_consent),  # consent_overlay
-            gr.Group(visible=not has_consent)   # consent_modal
-        )
-    
-    # Initialize app with consent checking
-    demo.load(fn=get_config, js=js, outputs=user_consented).then(
-        fn=update_visibility,
-        inputs=user_consented,
-        outputs=[main_app, consent_overlay, consent_modal]
+    # Check consent on page load
+    demo.load(
+        fn=lambda: None,
+        inputs=None, 
+        outputs=None,
+        js="async () => { await new Promise(r => setTimeout(r, 100)); return js(); }"
+    ).then(
+        fn=lambda: None,
+        inputs=None,
+        outputs=[user_consented],
+        js="() => { return window.check_cookie('feel_consent'); }"
+    ).then(
+        lambda has_consent: (gr.Group(visible=not has_consent), gr.Group(visible=has_consent)),
+        inputs=[user_consented],
+        outputs=[landing_page, main_app]
     )
 
-    # Function to handle consent button click
-    def handle_consent():
-        return True
-    
+    user_consented.change(
+        lambda x: get_config(gr.Request()),
+        inputs=[user_consented],
+        outputs=[landing_page, main_app]
+    )
+
+    # Function to show main app after consent
+    def show_main_app():
+        return gr.Group(visible=False), gr.Group(visible=True), True
+
     consent_btn.click(
-        fn=handle_consent,
-        outputs=user_consented,
-        js="(value) => set_cookie('feel_consent', 'true')"
-    ).then(
-        fn=update_visibility,
-        inputs=user_consented,
-        outputs=[main_app, consent_overlay, consent_modal]
+        fn=show_main_app,
+        inputs=[],
+        outputs=[landing_page, main_app, user_consented],
+        js="() => { window.set_cookie('feel_consent', 'true'); return true; }"
     )
 
     ##############################
