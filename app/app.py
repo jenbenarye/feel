@@ -611,8 +611,8 @@ js = '''function js(){
 
 with gr.Blocks(css=css, js=js) as demo:
     # State variable to track if user has consented
-    user_consented = gr.State(False)
 
+    user_consented = gr.State(value=False)  
     # Landing page with user agreement
     with gr.Group(visible=True) as landing_page:
         gr.Markdown("# Welcome to FeeL")
@@ -709,50 +709,38 @@ with gr.Blocks(css=css, js=js) as demo:
 
         submit_btn = gr.Button(value="💾 Submit conversation", visible=False)
 
-    # Overlay for the consent modal
-    with gr.Group(elem_classes=["modal-overlay"]) as consent_overlay:
-        pass
-        
-    # Consent popup
-    with gr.Group(elem_classes=["consent-modal"]) as consent_modal:
-        gr.Markdown("# User Agreement")
-        with gr.Group(elem_classes=["user-agreement-container"]):
-            gr.Markdown(USER_AGREEMENT)
-        consent_btn = gr.Button("I agree")
-
-    # Check consent on page load and show/hide components appropriately
-    def initialize_consent_status():
-        # This function will be called when the app loads
-        return False  # Default to not consented
-    
-    def update_visibility(has_consent):
-        # Show/hide components based on consent status
-        return (
-            gr.Group(visible=has_consent),  # main_app
-            gr.Group(visible=not has_consent),  # consent_overlay
-            gr.Group(visible=not has_consent)   # consent_modal
-        )
-    
-    # Initialize app with consent checking
-    demo.load(fn=initialize_consent_status, outputs=user_consented).then(
-        fn=update_visibility,
-        inputs=user_consented,
-        outputs=[main_app, consent_overlay, consent_modal],
-        js="async () => { await new Promise(r => setTimeout(r, 100)); const consented = window.check_cookie('feel_consent'); return consented; }"
+    # Check consent on page load
+    demo.load(
+        fn=lambda: None,
+        inputs=None, 
+        outputs=None,
+        js="async () => { await new Promise(r => setTimeout(r, 100)); return js(); }"
+    ).then(
+        fn=lambda: None,
+        inputs=None,
+        outputs=[user_consented],
+        js="() => { return window.check_cookie('feel_consent'); }"
+    ).then(
+        lambda has_consent: (gr.Group(visible=not has_consent), gr.Group(visible=has_consent)),
+        inputs=[user_consented],
+        outputs=[landing_page, main_app]
     )
 
-    # Function to handle consent button click
-    def handle_consent():
-        return True
-    
+    user_consented.change(
+        lambda x: get_config(gr.Request()),
+        inputs=[user_consented],
+        outputs=[landing_page, main_app]
+    )
+
+    # Function to show main app after consent
+    def show_main_app():
+        return gr.Group(visible=False), gr.Group(visible=True), True
+
     consent_btn.click(
-        fn=handle_consent,
-        outputs=user_consented,
+        fn=show_main_app,
+        inputs=[],
+        outputs=[landing_page, main_app, user_consented],
         js="() => { window.set_cookie('feel_consent', 'true'); return true; }"
-    ).then(
-        fn=update_visibility,
-        inputs=user_consented,
-        outputs=[main_app, consent_overlay, consent_modal]
     )
 
     ##############################
