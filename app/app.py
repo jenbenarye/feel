@@ -611,10 +611,17 @@ js = '''function js(){
 
 with gr.Blocks(css=css, js=js) as demo:
     # State variable to track if user has consented
-    user_consented = gr.State(value=False)  
-    
-    # Main application interface (initially visible but will be conditionally shown)
-    with gr.Group() as main_app:  # Remove explicit visible=True to let it be controlled dynamically
+    user_consented = gr.State(False)
+
+    # Landing page with user agreement
+    with gr.Group(visible=True) as landing_page:
+        gr.Markdown("# Welcome to FeeL")
+        with gr.Group(elem_classes=["user-agreement-container"]):
+            gr.Markdown(USER_AGREEMENT)
+        consent_btn = gr.Button("I agree")
+
+    # Main application interface (initially hidden)
+    with gr.Group(visible=False) as main_app:
         ##############################
         # Chatbot
         ##############################
