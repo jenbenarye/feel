@@ -9,7 +9,7 @@ dependencies = [
     "distilabel>=1.4.1",
     "ipykernel>=6.29.5",
     "torch>=2.5.1",
-    "transformers>=4.47.1",
+    "transformers>=4.51.0",
 ]
 
 [dependency-groups]
@@ -19,5 +19,5 @@ ml = [
 app = [
     "gradio>=5.23.1",
     "huggingface-hub>=0.26.5",
-    "transformers>=4.47.1",
+    "transformers>=4.51.0",
 ]
