@@ -70,16 +70,16 @@ CLIENT = create_inference_client()
 
 def get_persistent_storage_path(filename: str) -> tuple[Path, bool]:
     """Check if persistent storage is available and return the appropriate path.
-    
+
     Args:
         filename: The name of the file to check/create
-        
+
     Returns:
         A tuple containing (file_path, is_persistent)
     """
     persistent_path = Path("/data") / filename
     local_path = Path(__file__).parent / filename
-    
+
     # Check if persistent storage is available and writable
     use_persistent = False
     if Path("/data").exists() and Path("/data").is_dir():
@@ -92,7 +92,7 @@ def get_persistent_storage_path(filename: str) -> tuple[Path, bool]:
         except (PermissionError, OSError):
             print("Persistent storage exists but is not writable, falling back to local storage")
             use_persistent = False
-    
+
     return (persistent_path if use_persistent else local_path, use_persistent)
 
 
@@ -100,7 +100,7 @@ def load_languages() -> dict[str, str]:
     """Load languages from JSON file or persistent storage"""
     languages_path, use_persistent = get_persistent_storage_path("languages.json")
     local_path = Path(__file__).parent / "languages.json"
-    
+
     # If persistent storage is available but file doesn't exist yet, copy the local file to persistent storage
     if use_persistent and not languages_path.exists():
         try:
@@ -115,10 +115,10 @@ def load_languages() -> dict[str, str]:
         except Exception as e:
             print(f"Error setting up persistent storage: {e}")
             languages_path = local_path  # Fall back to local path if any error occurs
-    
+
     if not languages_path.exists() and local_path.exists():
         languages_path = local_path
-    
+
     if languages_path.exists():
         with open(languages_path, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -129,7 +129,7 @@ def load_languages() -> dict[str, str]:
 LANGUAGES = load_languages()
 
 USER_AGREEMENT = """
-You have been asked to participate in a research study conducted by Lingo Lab from the Computer Science and Artificial Intelligence Laboratory at the Massachusetts Institute of Technology (M.I.T.), together with huggingface. 
+You have been asked to participate in a research study conducted by Lingo Lab from the Computer Science and Artificial Intelligence Laboratory at the Massachusetts Institute of Technology (M.I.T.), together with huggingface.
 
 The purpose of this study is the collection of multilingual human feedback to improve language models. As part of this study you will interat with a language model in a langugage of your choice, and provide indication to wether its reponses are helpful or not.
 
@@ -268,17 +268,17 @@ def call_pipeline(messages: list, language: str):
     if ZERO_GPU:
         tokenizer = CLIENT["tokenizer"]
         formatted_prompt = tokenizer.apply_chat_template(
-            messages, 
-            tokenize=False, 
+            messages,
+            tokenize=False,
         )
-        
+
         response = CLIENT["pipeline"](
             formatted_prompt,
             clean_up_tokenization_spaces=False,
             max_length=2000,
             return_full_text=False,
         )
-        
+
         return response[0]["generated_text"]
     else:
         response = CLIENT(
@@ -299,7 +299,7 @@ def respond(
 
     Return the history with the new message"""
     messages = format_history_as_messages(history)
-    
+
     if ZERO_GPU:
         content = call_pipeline(messages, language)
     else:
@@ -311,7 +311,7 @@ def respond(
             temperature=temperature,
         )
         content = response.choices[0].message.content
-        
+
     message = gr.ChatMessage(role="assistant", content=content)
     history.append(message)
     return history
@@ -500,29 +500,29 @@ def close_add_language_modal():
 
 def save_new_language(lang_name, system_prompt):
     """Save the new language and system prompt to persistent storage if available, otherwise to local file."""
-    global LANGUAGES  
-    
+    global LANGUAGES
+
     languages_path, use_persistent = get_persistent_storage_path("languages.json")
     local_path = Path(__file__).parent / "languages.json"
-    
+
     if languages_path.exists():
         with open(languages_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     else:
         data = {}
-    
+
     data[lang_name] = system_prompt
 
     with open(languages_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-    
+
     if use_persistent and local_path != languages_path:
         try:
             with open(local_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"Error updating local backup: {e}")
-    
+
     LANGUAGES.update({lang_name: system_prompt})
     return gr.Group(visible=False), gr.HTML("<script>window.location.reload();</script>"), gr.Dropdown(choices=list(LANGUAGES.keys()))
 
@@ -552,14 +552,14 @@ button#add-language-btn {
 with gr.Blocks(css=css) as demo:
     # State variable to track if user has consented
     user_consented = gr.State(False)
-    
+
     # Landing page with user agreement
     with gr.Group(visible=True) as landing_page:
         gr.Markdown("# Welcome to FeeL")
         with gr.Group(elem_classes=["user-agreement-container"]):
             gr.Markdown(USER_AGREEMENT)
         consent_btn = gr.Button("I agree")
-    
+
     # Main application interface (initially hidden)
     with gr.Group(visible=False) as main_app:
         ##############################
@@ -572,7 +572,7 @@ with gr.Blocks(css=css) as demo:
         with gr.Accordion("About") as explanation:
             gr.Markdown(f"""
             FeeL is a collaboration between Hugging Face and MIT.
-            It is a community-driven project to provide a real-time feedback loop for VLMs, where your feedback is continuously used to fine-tune the underlying models.
+            It is a community-driven project to provide a real-time feedback loop for LMs, where your feedback is continuously used to fine-tune the underlying models.
             The [dataset](https://huggingface.co/datasets/{scheduler.repo_id}), [code](https://github.com/huggingface/feel) and [models](https://huggingface.co/collections/feel-fl/feel-models-67a9b6ef0fdd554315e295e8) are public.
 
             Start by selecting your language, chat with the model with text and images and provide feedback in different ways.
@@ -593,7 +593,7 @@ with gr.Blocks(css=css) as demo:
                         scale=8
                     )
                     add_language_btn = gr.Button(
-                        "+", 
+                        "+",
                         elem_id="add-language-btn",
                         size="sm"
                     )
@@ -719,7 +719,7 @@ with gr.Blocks(css=css) as demo:
         global LANGUAGES
         LANGUAGES = load_languages()
         language_choices = list(LANGUAGES.keys())
-        
+
         return str(uuid.uuid4()), gr.Dropdown(choices=language_choices, value=language_choices[0])
 
     demo.load(
