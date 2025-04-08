@@ -584,26 +584,19 @@ button#add-language-btn {
 
 def get_config(request: gr.Request):
     """Get configuration from cookies"""
-    config = {"feel_consent": False}
+    config = {"feel_consent": "false"}  # Default value
     if request and 'feel_consent' in request.cookies:
-        config["feel_consent"] = request.cookies['feel_consent'] == 'true'
-    return config["feel_consent"]
+        config["feel_consent"] = request.cookies['feel_consent']
+    return config["feel_consent"] == "true"  # Return boolean
+
+def initialize_consent_status(request: gr.Request):
+    """Initialize consent status from cookies"""
+    return get_config(request)
 
 js = '''function js(){
     window.set_cookie = function(key, value){
-        // Use a longer expiry and more complete cookie setting
-        const d = new Date();
-        d.setTime(d.getTime() + (365*24*60*60*1000));
-        document.cookie = key + "=" + value + ";path=/;expires=" + d.toUTCString() + ";SameSite=Lax";
-        return value === 'true';  // Return boolean directly
-    }
-    
-    window.check_cookie = function(key){
-        const value = document.cookie
-            .split('; ')
-            .find(row => row.startsWith(key + '='))
-            ?.split('=')[1];
-        return value === 'true';  // Return boolean directly
+        document.cookie = key+'='+value+'; Path=/; SameSite=Strict';
+        return [value];
     }
 }'''
 
@@ -728,21 +721,20 @@ with gr.Blocks(css=css, js=js) as demo:
         )
     
     # Initialize app with consent checking
-    demo.load(fn=initialize_consent_status, outputs=user_consented).then(
+    demo.load(
+        fn=initialize_consent_status,
+        outputs=user_consented,
+    ).then(
         fn=update_visibility,
         inputs=user_consented,
-        outputs=[main_app, consent_overlay, consent_modal],
-        js="async () => { await new Promise(r => setTimeout(r, 100)); const consented = window.check_cookie('feel_consent'); return consented; }"
+        outputs=[main_app, consent_overlay, consent_modal]
     )
 
-    # Function to handle consent button click
-    def handle_consent():
-        return True
-    
+    # Update the consent button click handler
     consent_btn.click(
-        fn=handle_consent,
+        fn=lambda: True,
         outputs=user_consented,
-        js="() => { window.set_cookie('feel_consent', 'true'); return true; }"
+        js="(value) => set_cookie('feel_consent', 'true')"
     ).then(
         fn=update_visibility,
         inputs=user_consented,
