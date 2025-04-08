@@ -12,7 +12,7 @@ import spaces
 import spaces
 import gradio as gr
 from feedback import save_feedback, scheduler
-from gradio.components.chatbot import OptionDict
+from gradio.components.chatbot import Option
 from huggingface_hub import InferenceClient
 from pandas import DataFrame
 from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
@@ -441,8 +441,8 @@ def wrangle_edit_data(
         )
         history = history[: index + 1]
         history[-1]["options"] = [
-            OptionDict(label="chosen", value=x.value),
-            OptionDict(label="rejected", value=original_message["content"]),
+            Option(label="chosen", value=x.value),
+            Option(label="rejected", value=original_message["content"]),
         ]
         return history
 
@@ -613,15 +613,9 @@ with gr.Blocks(css=css, js=js) as demo:
     # State variable to track if user has consented
 
     user_consented = gr.State(value=False)  
-    # Landing page with user agreement
-    with gr.Group(visible=True) as landing_page:
-        gr.Markdown("# Welcome to FeeL")
-        with gr.Group(elem_classes=["user-agreement-container"]):
-            gr.Markdown(USER_AGREEMENT)
-        consent_btn = gr.Button("I agree")
 
     # Main application interface (initially hidden)
-    with gr.Group(visible=False) as main_app:
+    with gr.Group() as main_app:
         ##############################
         # Chatbot
         ##############################
