@@ -604,58 +604,87 @@ js = '''function js(){
 
 with gr.Blocks(css=css, js=js) as demo:
     # State variable to track if user has consented
-
     user_consented = gr.State(value=False)
+
+    # Initialize language dropdown first
+    language = gr.State(value="English")  # Default language state
 
     # Main application interface (initially hidden)
     with gr.Group() as main_app:
-        ##############################
-        # Chatbot
-        ##############################
-        gr.Markdown("""
-        # ♾️ FeeL - a real-time Feedback Loop for LMs
-        """)
+        with gr.Row():
+            # Main content column (wider)
+            with gr.Column(scale=3, elem_classes=["main-content"]):
+                ##############################
+                # Chatbot
+                ##############################
+                gr.Markdown("""
+                # ♾️ FeeL - a real-time Feedback Loop for LMs
+                """, elem_classes=["app-title"])
 
-        with gr.Accordion("About") as explanation:
-            gr.Markdown(f"""
-            FeeL is a collaboration between Hugging Face and Harvard.
-            It is a community-driven project to provide a real-time feedback loop for LMs, where your feedback is continuously used to fine-tune the underlying models.
-            The [dataset](https://huggingface.co/datasets/{scheduler.repo_id}), [code](https://github.com/huggingface/feel) and [models](https://huggingface.co/collections/feel-fl/feel-models-67a9b6ef0fdd554315e295e8) are public.
+                with gr.Accordion("About") as explanation:
+                    gr.Markdown(f"""
+                    FeeL is a collaboration between Hugging Face and MIT.
+                    It is a community-driven project to provide a real-time feedback loop for LMs, where your feedback is continuously used to fine-tune the underlying models.
+                    The [dataset](https://huggingface.co/datasets/{scheduler.repo_id}), [code](https://github.com/huggingface/feel) and [models](https://huggingface.co/collections/feel-fl/feel-models-67a9b6ef0fdd554315e295e8) are public.
 
-            Start by selecting your language, chat with the model with text and images and provide feedback in different ways.
+                    Chat with the model using text and images and provide feedback in different ways:
 
-            - ✏️ Edit a message
-            - 👍/👎 Like or dislike a message
-            - 🔄 Regenerate a message
+                    - ✏️ Edit a message
+                    - 👍/👎 Like or dislike a message
+                    - 🔄 Regenerate a message
+                    """)
 
-            """)
+                chatbot = gr.Chatbot(
+                    elem_id="chatbot",
+                    editable="all",
+                    value=[
+                        {
+                            "role": "system",
+                            "content": LANGUAGES["English"],  # Use default language initially
+                        }
+                    ],
+                    type="messages",
+                    feedback_options=["Like", "Dislike"],
+                    height=600
+                )
 
-            with gr.Column():
-                gr.Markdown("Select your language or add a new one:")
-                with gr.Row():
-                    language = gr.Dropdown(
-                        choices=list(load_languages().keys()),
-                        container=False,
-                        show_label=False,
-                        scale=8
-                    )
-                    add_language_btn = gr.Button(
-                        "+",
-                        elem_id="add-language-btn",
-                        size="sm"
-                    )
+                chat_input = gr.Textbox(
+                    interactive=True,
+                    placeholder="Enter message or upload file...",
+                    show_label=False,
+                    submit_btn=True,
+                )
 
+                with gr.Accordion("Collected feedback", open=False):
+                    dataframe = gr.Dataframe(wrap=True, label="Collected feedback")
 
-        # Create a hidden group instead of a modal
-        with gr.Group(visible=False) as add_language_modal:
-            gr.Markdown("&nbsp;Add New Language")
-            new_lang_name = gr.Textbox(label="Language Name", lines=1)
-            new_system_prompt = gr.Textbox(label="System Prompt", lines=4)
-            with gr.Row():
-                with gr.Column(scale=1):
-                    save_language_btn = gr.Button("Save")
-                with gr.Column(scale=1):
-                    cancel_language_btn = gr.Button("Cancel")
+                submit_btn = gr.Button(value="💾 Submit conversation", visible=False)
+
+            # Sidebar column (narrower)
+            with gr.Column(scale=1, elem_classes=["sidebar"]):
+                gr.Markdown("### Language Settings")
+                gr.Markdown("Select your preferred language:")
+
+                language_dropdown = gr.Dropdown(
+                    choices=list(load_languages().keys()),
+                    value="English",  # Set default value
+                    container=True,
+                    show_label=False,
+                )
+
+                add_language_btn = gr.Button(
+                    "Add New Language",
+                    size="sm"
+                )
+
+                # Create a hidden group instead of a modal
+                with gr.Group(visible=False) as add_language_modal:
+                    gr.Markdown("### Add New Language")
+                    new_lang_name = gr.Textbox(label="Language Name", lines=1)
+                    new_system_prompt = gr.Textbox(label="System Prompt", lines=4)
+                    with gr.Row():
+                        save_language_btn = gr.Button("Save")
+                        cancel_language_btn = gr.Button("Cancel")
 
         refresh_html = gr.HTML(visible=False)
 
@@ -670,31 +699,6 @@ with gr.Blocks(css=css, js=js) as demo:
             value=str(uuid.uuid4()),
             visible=False,
         )
-
-        chatbot = gr.Chatbot(
-            elem_id="chatbot",
-            editable="all",
-            value=[
-                {
-                    "role": "system",
-                    "content": LANGUAGES[language.value],
-                }
-            ],
-            type="messages",
-            feedback_options=["Like", "Dislike"],
-        )
-
-        chat_input = gr.Textbox(
-            interactive=True,
-            placeholder="Enter message or upload file...",
-            show_label=False,
-            submit_btn=True,
-        )
-
-        with gr.Accordion("Collected feedback", open=False):
-            dataframe = gr.Dataframe(wrap=True, label="Collected feedback")
-
-        submit_btn = gr.Button(value="💾 Submit conversation", visible=False)
 
     # Overlay for the consent modal
     with gr.Group(elem_classes=["modal-overlay"]) as consent_overlay:
@@ -745,10 +749,14 @@ with gr.Blocks(css=css, js=js) as demo:
     # Deal with feedback
     ##############################
 
-    language.change(
+    language_dropdown.change(
         fn=format_system_message,
-        inputs=[language, chatbot],
+        inputs=[language_dropdown, chatbot],
         outputs=[chatbot],
+    ).then(
+        fn=lambda x: x,  # Update the language state
+        inputs=[language_dropdown],
+        outputs=[language]
     )
 
     chat_input.submit(
@@ -799,13 +807,14 @@ with gr.Blocks(css=css, js=js) as demo:
         global LANGUAGES
         LANGUAGES = load_languages()
         language_choices = list(LANGUAGES.keys())
+        default_language = language_choices[0] if language_choices else "English"
 
-        return str(uuid.uuid4()), gr.Dropdown(choices=language_choices, value=language_choices[0])
+        return str(uuid.uuid4()), gr.Dropdown(choices=language_choices, value=default_language), default_language
 
     demo.load(
         fn=on_app_load,
         inputs=None,
-        outputs=[session_id, language]
+        outputs=[session_id, language_dropdown, language]
     )
 
     add_language_btn.click(
@@ -821,7 +830,7 @@ with gr.Blocks(css=css, js=js) as demo:
     save_language_btn.click(
         fn=save_new_language,
         inputs=[new_lang_name, new_system_prompt],
-        outputs=[add_language_modal, refresh_html, language]
+        outputs=[add_language_modal, refresh_html, language_dropdown]
     )
 
 demo.launch()
