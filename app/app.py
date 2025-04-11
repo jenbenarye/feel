@@ -352,7 +352,7 @@ def wrangle_like_data(x: gr.LikeData, history) -> DataFrame:
             message["metadata"] = {}
         elif not isinstance(message["metadata"], dict):
             message["metadata"] = message["metadata"].__dict__
-            
+
         rating = message["metadata"].get("title")
         if rating == "liked":
             message["rating"] = 1
@@ -605,7 +605,7 @@ js = '''function js(){
 with gr.Blocks(css=css, js=js) as demo:
     # State variable to track if user has consented
 
-    user_consented = gr.State(value=False)  
+    user_consented = gr.State(value=False)
 
     # Main application interface (initially hidden)
     with gr.Group() as main_app:
@@ -618,7 +618,7 @@ with gr.Blocks(css=css, js=js) as demo:
 
         with gr.Accordion("About") as explanation:
             gr.Markdown(f"""
-            FeeL is a collaboration between Hugging Face and MIT.
+            FeeL is a collaboration between Hugging Face and Harvard.
             It is a community-driven project to provide a real-time feedback loop for LMs, where your feedback is continuously used to fine-tune the underlying models.
             The [dataset](https://huggingface.co/datasets/{scheduler.repo_id}), [code](https://github.com/huggingface/feel) and [models](https://huggingface.co/collections/feel-fl/feel-models-67a9b6ef0fdd554315e295e8) are public.
 
@@ -699,7 +699,7 @@ with gr.Blocks(css=css, js=js) as demo:
     # Overlay for the consent modal
     with gr.Group(elem_classes=["modal-overlay"]) as consent_overlay:
         pass
-        
+
     # Consent popup
     with gr.Group(elem_classes=["consent-modal"]) as consent_modal:
         gr.Markdown("# User Agreement")
@@ -711,7 +711,7 @@ with gr.Blocks(css=css, js=js) as demo:
     def initialize_consent_status():
         # This function will be called when the app loads
         return False  # Default to not consented
-    
+
     def update_visibility(has_consent):
         # Show/hide components based on consent status
         return (
@@ -719,7 +719,7 @@ with gr.Blocks(css=css, js=js) as demo:
             gr.Group(visible=not has_consent),  # consent_overlay
             gr.Group(visible=not has_consent)   # consent_modal
         )
-    
+
     # Initialize app with consent checking
     demo.load(
         fn=initialize_consent_status,
