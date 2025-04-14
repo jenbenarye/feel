@@ -558,17 +558,26 @@ def save_contributor_email(email, name=""):
 def view_contributors(password):
     """View contributor emails (protected)"""
     # Simple password check - in production, use a more secure method
-    if password != os.getenv("ADMIN_PASSWORD", "default_admin_password"):
-        return "Incorrect password", None
+    correct_password = os.getenv("ADMIN_PASSWORD", "default_admin_password")
+    if password != correct_password:
+        return "Incorrect password. Try using 'default_admin_password' if you haven't set the environment variable.", None
 
     emails_path, _ = get_persistent_storage_path("contributors.json")
+
     if not emails_path.exists():
-        return "No contributors found", None
+        return f"No contributors found. File does not exist at {emails_path}", None
 
-    with open(emails_path, "r", encoding="utf-8") as f:
-        contributors = json.load(f)
+    try:
+        with open(emails_path, "r", encoding="utf-8") as f:
+            contributors = json.load(f)
 
-    return "Contributors loaded successfully", gr.Dataframe(value=contributors)
+        if not contributors:
+            return "Contributors file exists but is empty.", None
+
+        # Make sure to return with visible=True
+        return f"Found {len(contributors)} contributors.", gr.Dataframe(value=contributors, visible=True)
+    except Exception as e:
+        return f"Error reading contributors file: {str(e)}", None
 
 css = """
 .options.svelte-pcaovb {
@@ -727,11 +736,11 @@ with gr.Blocks(css=css, js=js) as demo:
                         cancel_language_btn = gr.Button("Cancel")
 
                 # Add Contributors Tab
-                with gr.Accordion("Thank Contributors", open=False):
+                with gr.Accordion("Thank You for Contributing", open=False):
                     gr.Markdown("""
                     ### Thank You for Contributing!
 
-                    We'd like to thank you for using FeeL and contributing to the improvement of language models.
+                    We'd like to thank you for using FeeL and contributing to the improvement of multilingual language models.
                     If you'd like us to reach out to you, please leave your email below.
 
                     Your email will only be visible to the FeeL development team and won't be shared with others.
