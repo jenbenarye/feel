@@ -653,17 +653,17 @@ button#add-language-btn {
 /* Language settings styling */
 .language-settings-header {
     background-color: #FFD21E;  /* Hugging Face yellow */
-    padding: 15px;
+    padding: 5px;              /* Controls padding inside header */
     border-radius: 8px 8px 0 0;
-    margin-bottom: 0;
+    margin-bottom: 0;           /* Controls space below header */
     color: #333;
     font-weight: bold;
 }
 
 .language-instruction {
-    margin-top: 15px;
-    margin-bottom: 15px;
-    padding: 0 15px;
+    margin-top: 5px;           /* Controls space above instruction text */
+    margin-bottom: 5px;        /* Controls space below instruction text */
+    padding: 0 15px;            /* Controls left/right padding */
 }
 
 .language-container {
@@ -671,11 +671,11 @@ button#add-language-btn {
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    margin-bottom: 20px;
+    margin-bottom: 20px;        /* Space below the entire container */
 }
 
 .language-dropdown {
-    padding: 10px 15px 20px 15px;
+    padding: 10px 15px 20px 15px;  /* Controls padding around dropdown (top, right, bottom, left) */
 }
 
 .add-language-btn {
