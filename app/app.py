@@ -581,9 +581,14 @@ def view_contributors(password):
         if not contributors:
             return "Contributors file exists but is empty.", gr.Dataframe(visible=False)
 
+        # Convert the list of dictionaries to a pandas DataFrame
+        # This is what Gradio's Dataframe component expects
+        df = DataFrame(contributors)
+
         # Return the DataFrame with visible=True
-        return f"Found {len(contributors)} contributors.", gr.Dataframe(value=contributors, visible=True)
+        return f"Found {len(contributors)} contributors.", gr.Dataframe(value=df, visible=True)
     except Exception as e:
+        print(f"Error reading contributors file: {str(e)}")
         return f"Error reading contributors file: {str(e)}", gr.Dataframe(visible=False)
 
 css = """
