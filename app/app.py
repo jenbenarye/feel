@@ -1,6 +1,10 @@
 import os
 import random
 import uuid
+import smtplib
+import ssl
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from base64 import b64encode
 from datetime import datetime
 from mimetypes import guess_type
@@ -530,8 +534,58 @@ def save_new_language(lang_name, system_prompt):
     return gr.Group(visible=False), gr.HTML("<script>window.location.reload();</script>"), gr.Dropdown(choices=list(LANGUAGES.keys()))
 
 
+def send_email_notification(contributor_data):
+    """Send an email notification to the admin team about a new contributor."""
+    admin_email = os.getenv("ADMIN_EMAIL")
+    if not admin_email:
+        print("ADMIN_EMAIL environment variable not set, skipping notification")
+        return False
+
+    # Email sending configuration
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_username = os.getenv("SMTP_USERNAME")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+
+    if not smtp_username or not smtp_password:
+        print("SMTP credentials not set, skipping notification")
+        return False
+
+    try:
+        # Create message
+        msg = MIMEMultipart()
+        msg["Subject"] = "New FeeL Contributor Submission"
+        msg["From"] = smtp_username
+        msg["To"] = admin_email
+
+        # Email body
+        body = f"""
+        New contributor has submitted their information:
+
+        Email: {contributor_data.get('email', 'Not provided')}
+        Name: {contributor_data.get('name', 'Not provided')}
+        Timestamp: {contributor_data.get('timestamp', datetime.now().isoformat())}
+        """
+
+        msg.attach(MIMEText(body, "plain"))
+
+        # Send email
+        context = ssl.create_default_context()
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls(context=context)
+            server.login(smtp_username, smtp_password)
+            server.send_message(msg)
+
+        print(f"Email notification sent to {admin_email}")
+        return True
+
+    except Exception as e:
+        print(f"Error sending email notification: {e}")
+        return False
+
+
 def save_contributor_email(email, name=""):
-    """Save contributor email to persistent storage"""
+    """Save contributor email to persistent storage and notify admin"""
     emails_path, use_persistent = get_persistent_storage_path("contributors.json")
 
     # Read existing emails
@@ -541,43 +595,24 @@ def save_contributor_email(email, name=""):
     else:
         contributors = []
 
-    # Add new email with timestamp
-    contributors.append({
+    # Create contributor data
+    contributor_data = {
         "email": email,
         "name": name,
         "timestamp": datetime.now().isoformat()
-    })
+    }
+
+    # Add new email with timestamp
+    contributors.append(contributor_data)
 
     # Save back to file
     with open(emails_path, "w", encoding="utf-8") as f:
         json.dump(contributors, f, ensure_ascii=False, indent=2)
 
+    # Send email notification
+    send_email_notification(contributor_data)
+
     return True
-
-# Add this to view emails (protected with admin password)
-def view_contributors(password):
-    """View contributor emails (protected)"""
-    # Simple password check - in production, use a more secure method
-    correct_password = os.getenv("ADMIN_PASSWORD", "default_admin_password")
-    if password != correct_password:
-        return "Incorrect password. Try using 'default_admin_password' if you haven't set the environment variable.", gr.Dataframe(visible=False)
-
-    emails_path, _ = get_persistent_storage_path("contributors.json")
-
-    if not emails_path.exists():
-        return f"No contributors found. File does not exist at {emails_path}", gr.Dataframe(visible=False)
-
-    try:
-        with open(emails_path, "r", encoding="utf-8") as f:
-            contributors = json.load(f)
-
-        if not contributors:
-            return "Contributors file exists but is empty.", gr.Dataframe(visible=False)
-
-        # Return the DataFrame with visible=True
-        return f"Found {len(contributors)} contributors.", gr.Dataframe(value=contributors, visible=True)
-    except Exception as e:
-        return f"Error reading contributors file: {str(e)}", gr.Dataframe(visible=False)
 
 css = """
 .options.svelte-pcaovb {
@@ -761,16 +796,6 @@ with gr.Blocks(css=css, js=js) as demo:
                     submit_email_btn = gr.Button("Submit")
                     email_submit_status = gr.Markdown("")
 
-                    # Admin section (hidden by default)
-                    with gr.Accordion("Admin Access", open=False, visible=True):
-                        admin_password = gr.Textbox(
-                            label="Admin Password",
-                            type="password"
-                        )
-                        view_emails_btn = gr.Button("View Contributors")
-                        admin_status = gr.Markdown("")
-                        contributor_table = gr.Dataframe(visible=False)
-
         refresh_html = gr.HTML(visible=False)
 
         session_id = gr.Textbox(
@@ -927,12 +952,6 @@ with gr.Blocks(css=css, js=js) as demo:
         fn=lambda email, name, consent: save_contributor_email(email, name) if consent else None,
         inputs=[contributor_email, contributor_name, email_consent],
         outputs=None
-    )
-
-    view_emails_btn.click(
-        fn=view_contributors,
-        inputs=[admin_password],
-        outputs=[admin_status, contributor_table]
     )
 
 demo.launch()
