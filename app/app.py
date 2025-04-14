@@ -560,24 +560,24 @@ def view_contributors(password):
     # Simple password check - in production, use a more secure method
     correct_password = os.getenv("ADMIN_PASSWORD", "default_admin_password")
     if password != correct_password:
-        return "Incorrect password. Try using 'default_admin_password' if you haven't set the environment variable.", None
+        return "Incorrect password. Try using 'default_admin_password' if you haven't set the environment variable.", gr.Dataframe(visible=False)
 
     emails_path, _ = get_persistent_storage_path("contributors.json")
 
     if not emails_path.exists():
-        return f"No contributors found. File does not exist at {emails_path}", None
+        return f"No contributors found. File does not exist at {emails_path}", gr.Dataframe(visible=False)
 
     try:
         with open(emails_path, "r", encoding="utf-8") as f:
             contributors = json.load(f)
 
         if not contributors:
-            return "Contributors file exists but is empty.", None
+            return "Contributors file exists but is empty.", gr.Dataframe(visible=False)
 
-        # Make sure to return with visible=True
+        # Return the DataFrame with visible=True
         return f"Found {len(contributors)} contributors.", gr.Dataframe(value=contributors, visible=True)
     except Exception as e:
-        return f"Error reading contributors file: {str(e)}", None
+        return f"Error reading contributors file: {str(e)}", gr.Dataframe(visible=False)
 
 css = """
 .options.svelte-pcaovb {
