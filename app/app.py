@@ -802,8 +802,6 @@ with gr.Blocks(css=css, js=js) as demo:
                 # Add Contributors Tab
                 with gr.Accordion("Thank You for Contributing", open=False):
                     gr.Markdown("""
-                    ### Thank You for Contributing!
-
                     We'd like to thank you for using FeeL and contributing to the improvement of multilingual language models.
                     If you'd like us to reach out to you, please leave your email below.
 
