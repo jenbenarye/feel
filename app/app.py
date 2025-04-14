@@ -1004,46 +1004,4 @@ with gr.Blocks(css=css, js=js) as demo:
         Have questions, requests, or ideas for how we can improve? Email us at: **jen_ben@mit.edu**
         """)
 
-    def debug_file_locations():
-        """Debug function to print file locations to logs"""
-        languages_path, is_persistent = get_persistent_storage_path("languages.json")
-        contributors_path, is_persistent_contrib = get_persistent_storage_path("contributors.json")
-
-        # Print absolute paths
-        print(f"Languages file SHOULD be at: {languages_path.absolute()}")
-        print(f"Using persistent storage: {is_persistent}")
-        print(f"Languages file exists: {languages_path.exists()}")
-
-        print(f"Contributors file SHOULD be at: {contributors_path.absolute()}")
-        print(f"Contributors file exists: {contributors_path.exists()}")
-
-        # Check data directory
-        data_dir = Path("/data")
-        print(f"/data directory exists: {data_dir.exists()}")
-        if data_dir.exists():
-            print(f"/data contents: {list(data_dir.iterdir())}")
-
-        # Check current directory
-        current_dir = Path(".")
-        print(f"Current directory: {current_dir.absolute()}")
-        print(f"Current directory contents: {list(current_dir.iterdir())}")
-
-        # Check app directory
-        app_dir = Path(__file__).parent
-        print(f"App directory: {app_dir.absolute()}")
-        print(f"App directory contents: {list(app_dir.iterdir())}")
-
-        return "Debug info printed to logs"
-
-    # Add this button somewhere in your admin section
-    debug_btn = gr.Button("Debug File Locations")
-    debug_status = gr.Markdown("")
-
-    # Connect the event handler
-    debug_btn.click(
-        fn=debug_file_locations,
-        inputs=[],
-        outputs=[debug_status]
-    )
-
 demo.launch()
