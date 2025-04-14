@@ -753,7 +753,7 @@ with gr.Blocks(css=css, js=js) as demo:
                     email_submit_status = gr.Markdown("")
 
                     # Admin section (hidden by default)
-                    with gr.Accordion("Admin Access", open=False, visible=False):
+                    with gr.Accordion("Admin Access", open=False, visible=True):
                         admin_password = gr.Textbox(
                             label="Admin Password",
                             type="password"
