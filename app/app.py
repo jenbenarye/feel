@@ -650,6 +650,45 @@ button#add-language-btn {
 .footer-banner p {
     margin: 0;
 }
+/* Language settings styling */
+.language-settings-header {
+    background-color: #FFD21E;  /* Hugging Face yellow */
+    padding: 15px;
+    border-radius: 8px 8px 0 0;
+    margin-bottom: 0;
+    color: #333;
+    font-weight: bold;
+}
+
+.language-instruction {
+    margin-top: 15px;
+    margin-bottom: 15px;
+    padding: 0 15px;
+}
+
+.language-container {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.language-dropdown {
+    padding: 10px 15px 20px 15px;
+}
+
+.add-language-btn {
+    background-color: #FFD21E !important;
+    color: #333 !important;
+    border: none !important;
+    font-weight: bold !important;
+    transition: background-color 0.3s !important;
+}
+
+.add-language-btn:hover {
+    background-color: #F3C200 !important;
+}
 """
 
 def get_config(request: gr.Request):
@@ -703,7 +742,6 @@ with gr.Blocks(css=css, js=js) as demo:
                     - 👍/👎 Like or dislike a message
                     - 🔄 Regenerate a message
 
-                    **Have questions or ideas for improvement?** Contact us at: jen_ben@mit.edu
                     """)
 
                 chatbot = gr.Chatbot(
@@ -734,20 +772,23 @@ with gr.Blocks(css=css, js=js) as demo:
 
             # Sidebar column (narrower)
             with gr.Column(scale=1, elem_classes=["sidebar"]):
-                gr.Markdown("### Language Settings")
-                gr.Markdown("Select your preferred language:")
+                with gr.Group(elem_classes=["language-container"]):
+                    gr.Markdown("### Language Settings", elem_classes=["language-settings-header"])
+                    gr.Markdown("Select your preferred language:", elem_classes=["language-instruction"])
 
-                language_dropdown = gr.Dropdown(
-                    choices=list(load_languages().keys()),
-                    value="English",  # Set default value
-                    container=True,
-                    show_label=False,
-                )
+                    with gr.Column(elem_classes=["language-dropdown"]):
+                        language_dropdown = gr.Dropdown(
+                            choices=list(load_languages().keys()),
+                            value="English",
+                            container=True,
+                            show_label=False,
+                        )
 
-                add_language_btn = gr.Button(
-                    "Add New Language",
-                    size="sm"
-                )
+                    add_language_btn = gr.Button(
+                        "Add New Language",
+                        size="sm",
+                        elem_classes=["add-language-btn"]
+                    )
 
                 # Create a hidden group instead of a modal
                 with gr.Group(visible=False) as add_language_modal:
