@@ -565,7 +565,7 @@ def view_contributors(password):
     print(f"Entered password: {password}, Correct: {password == correct_password}")
 
     if password != correct_password:
-        return "Incorrect password. Try using 'default_admin_password' if you haven't set the environment variable.", gr.Dataframe(visible=False)
+        return "Incorrect password. Please try again.", gr.Dataframe(visible=False)
 
     emails_path, _ = get_persistent_storage_path("contributors.json")
 
@@ -582,7 +582,6 @@ def view_contributors(password):
             return "Contributors file exists but is empty.", gr.Dataframe(visible=False)
 
         # Convert the list of dictionaries to a pandas DataFrame
-        # This is what Gradio's Dataframe component expects
         df = DataFrame(contributors)
 
         # Return the DataFrame with visible=True
