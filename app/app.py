@@ -640,6 +640,16 @@ button#add-language-btn {
     background-color: rgba(0, 0, 0, 0.5) !important;
     z-index: 9998 !important;
 }
+.footer-banner {
+    background-color: #f5f5f5;
+    padding: 10px 20px;
+    border-top: 1px solid #ddd;
+    margin-top: 20px;
+    text-align: center;
+}
+.footer-banner p {
+    margin: 0;
+}
 """
 
 def get_config(request: gr.Request):
@@ -692,6 +702,8 @@ with gr.Blocks(css=css, js=js) as demo:
                     - ✏️ Edit a message
                     - 👍/👎 Like or dislike a message
                     - 🔄 Regenerate a message
+
+                    **Have questions or ideas for improvement?** Contact us at: jen_ben@mit.edu
                     """)
 
                 chatbot = gr.Chatbot(
@@ -945,5 +957,12 @@ with gr.Blocks(css=css, js=js) as demo:
         inputs=[admin_password],
         outputs=[admin_status, contributor_table]
     )
+
+    # Add a contact footer at the bottom of the page
+    with gr.Row(elem_classes=["footer-banner"]):
+        gr.Markdown("""
+        ### Contact Us
+        Have questions, requests, or ideas for how we can improve? Email us at: **jen_ben@mit.edu**
+        """)
 
 demo.launch()
