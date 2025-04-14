@@ -530,6 +530,46 @@ def save_new_language(lang_name, system_prompt):
     return gr.Group(visible=False), gr.HTML("<script>window.location.reload();</script>"), gr.Dropdown(choices=list(LANGUAGES.keys()))
 
 
+def save_contributor_email(email, name=""):
+    """Save contributor email to persistent storage"""
+    emails_path, use_persistent = get_persistent_storage_path("contributors.json")
+
+    # Read existing emails
+    if emails_path.exists():
+        with open(emails_path, "r", encoding="utf-8") as f:
+            contributors = json.load(f)
+    else:
+        contributors = []
+
+    # Add new email with timestamp
+    contributors.append({
+        "email": email,
+        "name": name,
+        "timestamp": datetime.now().isoformat()
+    })
+
+    # Save back to file
+    with open(emails_path, "w", encoding="utf-8") as f:
+        json.dump(contributors, f, ensure_ascii=False, indent=2)
+
+    return True
+
+# Add this to view emails (protected with admin password)
+def view_contributors(password):
+    """View contributor emails (protected)"""
+    # Simple password check - in production, use a more secure method
+    if password != os.getenv("ADMIN_PASSWORD", "default_admin_password"):
+        return "Incorrect password", None
+
+    emails_path, _ = get_persistent_storage_path("contributors.json")
+    if not emails_path.exists():
+        return "No contributors found", None
+
+    with open(emails_path, "r", encoding="utf-8") as f:
+        contributors = json.load(f)
+
+    return "Contributors loaded successfully", gr.Dataframe(value=contributors)
+
 css = """
 .options.svelte-pcaovb {
     display: none !important;
@@ -686,6 +726,42 @@ with gr.Blocks(css=css, js=js) as demo:
                         save_language_btn = gr.Button("Save")
                         cancel_language_btn = gr.Button("Cancel")
 
+                # Add Contributors Tab
+                with gr.Accordion("Thank Contributors", open=False):
+                    gr.Markdown("""
+                    ### Thank You for Contributing!
+
+                    We'd like to thank you for using FeeL and contributing to the improvement of language models.
+                    If you'd like us to reach out to you, please leave your email below.
+
+                    Your email will only be visible to the FeeL development team and won't be shared with others.
+                    """)
+                    contributor_email = gr.Textbox(
+                        label="Your Email (optional)",
+                        placeholder="email@example.com",
+                        type="email"
+                    )
+                    contributor_name = gr.Textbox(
+                        label="Your Name (optional)",
+                        placeholder="Your name"
+                    )
+                    email_consent = gr.Checkbox(
+                        label="I consent to being contacted by the FeeL team about my contributions",
+                        value=False
+                    )
+                    submit_email_btn = gr.Button("Submit")
+                    email_submit_status = gr.Markdown("")
+
+                    # Admin section (hidden by default)
+                    with gr.Accordion("Admin Access", open=False, visible=False):
+                        admin_password = gr.Textbox(
+                            label="Admin Password",
+                            type="password"
+                        )
+                        view_emails_btn = gr.Button("View Contributors")
+                        admin_status = gr.Markdown("")
+                        contributor_table = gr.Dataframe(visible=False)
+
         refresh_html = gr.HTML(visible=False)
 
         session_id = gr.Textbox(
@@ -831,6 +907,23 @@ with gr.Blocks(css=css, js=js) as demo:
         fn=save_new_language,
         inputs=[new_lang_name, new_system_prompt],
         outputs=[add_language_modal, refresh_html, language_dropdown]
+    )
+
+    # Connect the events
+    submit_email_btn.click(
+        fn=lambda email, name, consent: "Thank you for your submission!" if consent else "Please provide consent to submit",
+        inputs=[contributor_email, contributor_name, email_consent],
+        outputs=[email_submit_status]
+    ).then(
+        fn=lambda email, name, consent: save_contributor_email(email, name) if consent else None,
+        inputs=[contributor_email, contributor_name, email_consent],
+        outputs=None
+    )
+
+    view_emails_btn.click(
+        fn=view_contributors,
+        inputs=[admin_password],
+        outputs=[admin_status, contributor_table]
     )
 
 demo.launch()
