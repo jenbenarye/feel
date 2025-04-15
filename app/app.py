@@ -1004,4 +1004,113 @@ with gr.Blocks(css=css, js=js) as demo:
         Have questions, requests, or ideas for how we can improve? Email us at: **jen_ben@mit.edu**
         """)
 
+    # Add a subtle language management section at the bottom
+    with gr.Row(elem_classes=["footer-section"]):
+        with gr.Accordion("🔧 Admin Language Management", open=False, elem_classes=["admin-tools-accordion"]):
+            gr.Markdown("### Language File Manager")
+
+            # Password authentication
+            with gr.Row():
+                admin_password = gr.Textbox(
+                    type="password",
+                    label="Admin Password",
+                    placeholder="Enter admin password"
+                )
+                auth_button = gr.Button("Authenticate", size="sm")
+
+            auth_status = gr.Markdown("")
+
+            # File management (initially hidden)
+            with gr.Group(visible=False) as lang_editor_group:
+                gr.Markdown("Edit the languages JSON file below:")
+
+                # Language file editor
+                lang_json_editor = gr.Code(
+                    language="json",
+                    label="Languages JSON",
+                    lines=15
+                )
+
+                with gr.Row():
+                    load_button = gr.Button("Load Current Languages", size="sm")
+                    save_button = gr.Button("Save Changes", size="sm", variant="primary")
+
+                result_message = gr.Markdown("")
+
+    # Add the necessary functions
+    def authenticate(password):
+        """Authenticate the admin password"""
+        correct_password = os.getenv("ADMIN_PASSWORD", "default_admin_password")
+        if password == correct_password:
+            return "✅ Authentication successful. You can now manage languages.", gr.Group(visible=True)
+        else:
+            return "❌ Incorrect password. Please try again.", gr.Group(visible=False)
+
+    def load_languages_file():
+        """Load the languages file from persistent storage"""
+        languages_path, _ = get_persistent_storage_path("languages.json")
+        try:
+            with open(languages_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return content, "Languages file loaded successfully."
+        except Exception as e:
+            return "", f"Error loading languages file: {str(e)}"
+
+    def save_languages_file(json_content):
+        """Save the languages file to persistent storage"""
+        try:
+            # Validate JSON format
+            languages_dict = json.loads(json_content)
+
+            # Basic validation
+            if not isinstance(languages_dict, dict):
+                return "Error: Content must be a JSON object (dictionary)."
+
+            for key, value in languages_dict.items():
+                if not isinstance(key, str) or not isinstance(value, str):
+                    return f"Error: Keys and values must be strings. Issue with: {key}: {value}"
+
+            # Save to file
+            languages_path, _ = get_persistent_storage_path("languages.json")
+            with open(languages_path, "w", encoding="utf-8") as f:
+                f.write(json_content)
+
+            return f"✅ Languages file updated successfully with {len(languages_dict)} languages."
+        except json.JSONDecodeError as e:
+            return f"❌ Invalid JSON format: {str(e)}"
+        except Exception as e:
+            return f"❌ Error saving languages file: {str(e)}"
+
+    # Connect the event handlers
+    auth_button.click(
+        fn=authenticate,
+        inputs=[admin_password],
+        outputs=[auth_status, lang_editor_group]
+    )
+
+    load_button.click(
+        fn=load_languages_file,
+        inputs=[],
+        outputs=[lang_json_editor, result_message]
+    )
+
+    save_button.click(
+        fn=save_languages_file,
+        inputs=[lang_json_editor],
+        outputs=[result_message]
+    )
+
+    # Add CSS for the admin section
+    css += """
+    .footer-section {
+        margin-top: 40px;
+        border-top: 1px solid #eee;
+        padding-top: 20px;
+    }
+    .admin-tools-accordion {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    """
+
 demo.launch()
