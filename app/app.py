@@ -698,14 +698,21 @@ button.yellow-btn {
 
 def get_config(request: gr.Request):
     """Get configuration from cookies"""
-    config = {"feel_consent": "false"}  # Default value
-    if request and 'feel_consent' in request.cookies:
-        config["feel_consent"] = request.cookies['feel_consent']
-    return config["feel_consent"] == "true"  # Return boolean
+    config = {
+        "feel_consent": "false",
+    }
+    
+    if request and request.cookies:
+        for key in config.keys():
+            if key in request.cookies:
+                config[key] = request.cookies[key]
+                
+    return config["feel_consent"] == "true"
 
 def initialize_consent_status(request: gr.Request):
-    """Initialize consent status from cookies"""
-    return get_config(request)
+    """Initialize consent status and language preference from cookies"""
+    has_consent = get_config(request)
+    return has_consent
 
 js = '''function js(){
     window.set_cookie = function(key, value){
@@ -888,6 +895,7 @@ with gr.Blocks(css=css, js=js) as demo:
     demo.load(
         fn=initialize_consent_status,
         outputs=user_consented,
+        js=js
     ).then(
         fn=update_visibility,
         inputs=user_consented,
@@ -898,7 +906,7 @@ with gr.Blocks(css=css, js=js) as demo:
     consent_btn.click(
         fn=lambda: True,
         outputs=user_consented,
-        js="(value) => set_cookie('feel_consent', 'true')"
+        js="() => set_cookie('feel_consent', 'true')"
     ).then(
         fn=update_visibility,
         inputs=user_consented,
