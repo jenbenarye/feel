@@ -22,6 +22,8 @@ from gradio.components.chatbot import Option
 from huggingface_hub import InferenceClient
 from pandas import DataFrame
 from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
+import threading
+from collections import defaultdict
 
 
 BASE_MODEL = os.getenv("MODEL", "google/gemma-3-12b-pt")
@@ -525,9 +527,63 @@ def wrangle_retry_data(
     )
     return history, update_dataframe(dataframe, history)
 
+# Global variables for tracking language data points
+LANGUAGE_DATA_POINTS = defaultdict(int)
+language_data_lock = threading.Lock()
+
+def get_leaderboard_data():
+    """Get sorted leaderboard data for all languages"""
+    with language_data_lock:
+        leaderboard_data = {lang: LANGUAGE_DATA_POINTS.get(lang, 0) for lang in LANGUAGES.keys()}
+        sorted_data = sorted(leaderboard_data.items(), key=lambda x: x[1], reverse=True)
+        return sorted_data
+
+def increment_language_data_point(language):
+    """Increment the data point count for a specific language"""
+    with language_data_lock:
+        LANGUAGE_DATA_POINTS[language] += 1
+    return get_leaderboard_data()
+
+def set_language_data_points(language, count):
+    """Manually set the data point count for a specific language"""
+    with language_data_lock:
+        LANGUAGE_DATA_POINTS[language] = count
+    return get_leaderboard_data()
+
+def load_initial_language_data():
+    """Load initial language data points from persistent storage or default values"""
+    data_points_path, use_persistent = get_persistent_storage_path("language_data_points.json")
+    
+    if data_points_path.exists():
+        try:
+            with open(data_points_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                with language_data_lock:
+                    LANGUAGE_DATA_POINTS.clear()
+                    LANGUAGE_DATA_POINTS.update(data)
+        except Exception as e:
+            print(f"Error loading language data points: {e}")
+    
+    for lang in LANGUAGES.keys():
+        if lang not in LANGUAGE_DATA_POINTS:
+            LANGUAGE_DATA_POINTS[lang] = 0
+            
+    return get_leaderboard_data()
+
+def save_language_data_points():
+    """Save language data points to persistent storage"""
+    data_points_path, use_persistent = get_persistent_storage_path("language_data_points.json")
+    
+    try:
+        with language_data_lock:
+            with open(data_points_path, "w", encoding="utf-8") as f:
+                json.dump(dict(LANGUAGE_DATA_POINTS), f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Error saving language data points: {e}")
+
 
 def submit_conversation(dataframe, conversation_id, session_id, language):
-    """ "Submit the conversation to dataset repo"""
+    """ "Submit the conversation to dataset repo & update leaderboard"""
     if dataframe.empty or len(dataframe) < 2:
         gr.Info("No feedback to submit.")
         return (gr.Dataframe(value=None, interactive=False), [])
@@ -543,7 +599,10 @@ def submit_conversation(dataframe, conversation_id, session_id, language):
         "language": language,
     }
     save_feedback(input_object=conversation_data)
-    return (gr.Dataframe(value=None, interactive=False), [])
+    leaderboard_data = increment_language_data_point(language)
+    save_language_data_points()
+    
+    return (gr.Dataframe(value=None, interactive=False), [], leaderboard_data)
 
 
 def open_add_language_modal():
@@ -813,42 +872,80 @@ button.yellow-btn {
     padding: 10px 0;
     margin-top: 5px;
 }
+
+/* Leaderboard styles */
+.leaderboard-container {
+    border-left: 1px solid #eaeaea;
+    padding-left: 1rem;
+    height: 100%;
+}
+.leaderboard-title {
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+.leaderboard-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+.leaderboard-rank {
+    font-weight: bold;
+    margin-right: 0.5rem;
+}
+.leaderboard-language {
+    flex-grow: 1;
+}
+.leaderboard-count {
+    font-weight: bold;
+}
+.leaderboard-admin-panel {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eaeaea;
+}
 """
 
 def get_config(request: gr.Request):
     """Get configuration from cookies"""
-    config = {
-        "feel_consent": "false",
-    }
-
-    if request and request.cookies:
-        for key in config.keys():
-            if key in request.cookies:
-                config[key] = request.cookies[key]
-
-    return config["feel_consent"] == "true"
-
-def initialize_consent_status(request: gr.Request):
-    """Initialize consent status and language preference from cookies"""
-    has_consent = get_config(request)
-    return has_consent
+    config = {"feel_consent": False}
+    if request and 'feel_consent' in request.cookies:
+        config["feel_consent"] = request.cookies['feel_consent'] == 'true'
+    return config["feel_consent"]
 
 js = '''function js(){
     window.set_cookie = function(key, value){
-        document.cookie = key+'='+value+'; Path=/; SameSite=Strict';
-        return [value];
+        console.log('Setting cookie:', key, value);
+        document.cookie = key+'='+value+'; Path=/; SameSite=Strict; max-age=31536000';  // 1 year expiry
+        console.log('Current cookies:', document.cookie);
+        return [value]
+    }
+    
+    window.check_cookie = function(key){
+        console.log('Checking cookie:', key);
+        console.log('All cookies:', document.cookie);
+        const value = document.cookie.split('; ').find(row => row.startsWith(key + '='))?.split('=')[1];
+        console.log('Found value:', value);
+        return [value === 'true']
     }
 }'''
 
 
 
+
 with gr.Blocks(css=css, js=js) as demo:
     # State variable to track if user has consented
-    user_consented = gr.State(value=False)
-
-    # Initialize language dropdown first
-    language = gr.State(value="English")  # Default language state
-
+    user_consented = gr.State(value=False)  
+    leaderboard_data = gr.State([])
+    
+    # Landing page with user agreement
+    with gr.Group(visible=True) as landing_page:
+        gr.Markdown("# Welcome to FeeL")
+        with gr.Group(elem_classes=["user-agreement-container"]):
+            gr.Markdown(USER_AGREEMENT)
+        consent_btn = gr.Button("I agree")
+    
     # Main application interface (initially hidden)
     with gr.Group() as main_app:
         with gr.Row():
@@ -923,6 +1020,38 @@ with gr.Blocks(css=css, js=js) as demo:
                         size="sm",
                         elem_classes=["add-language-btn"]
                     )
+
+            # Right column with leaderboard
+            with gr.Column(scale=3, elem_classes=["leaderboard-container"]):
+                gr.Markdown("# Language Leaderboard", elem_classes=["leaderboard-title"])
+                leaderboard_html = gr.HTML("Loading leaderboard...")
+                
+                with gr.Accordion("Admin Controls", open=False, visible=False) as admin_panel:
+                    with gr.Row():
+                        admin_language = gr.Dropdown(choices=list(LANGUAGES.keys()), label="Language")
+                        admin_count = gr.Number(value=0, label="Data Points")
+                    set_count_btn = gr.Button("Set Count")
+                    
+                # toggle button for admin panel?
+                admin_toggle = gr.Button("Admin Controls", visible=True)
+
+            # update leaderboard HTML
+            def update_leaderboard_html(data):
+                if not data:
+                    return "Loading leaderboard..."
+                
+                html = "<div class='leaderboard-content'>"
+                for idx, (lang, count) in enumerate(data):
+                    html += f"""
+                    <div class='leaderboard-item'>
+                        <span class='leaderboard-rank'>#{idx+1}</span>
+                        <span class='leaderboard-language'>{lang}</span>
+                        <span class='leaderboard-count'>{count}</span>
+                    </div>
+                    """
+                html += "</div>"
+                return html
+
 
                 # Create a hidden group instead of a modal
                 with gr.Group(visible=False) as add_language_modal:
@@ -1086,6 +1215,11 @@ with gr.Blocks(css=css, js=js) as demo:
     ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe]).then(
         submit_conversation,
         inputs=[dataframe, conversation_id, session_id, language],
+        outputs=[dataframe, chatbot, leaderboard_data]
+    ).then(
+        update_leaderboard_html,
+        inputs=[leaderboard_data],
+        outputs=[leaderboard_html]
     )
 
     chatbot.like(
@@ -1128,11 +1262,27 @@ with gr.Blocks(css=css, js=js) as demo:
         default_language = language_choices[0] if language_choices else "English"
 
         return str(uuid.uuid4()), gr.Dropdown(choices=language_choices, value=default_language), default_language
-
+    
+    def toggle_admin_panel(visible):
+        return gr.Accordion(visible=not visible)
+    
+    def handle_set_count(language, count):
+        updated_data = set_language_data_points(language, int(count))
+        save_language_data_points()
+        return update_leaderboard_html(updated_data), updated_data
+    
     demo.load(
-        fn=on_app_load,
+        fn=lambda: (on_app_load(), load_initial_language_data()),
         inputs=None,
-        outputs=[session_id, language_dropdown, language]
+        outputs=[
+            session_id, 
+            language,
+            leaderboard_data
+        ]
+    ).then(
+        fn=update_leaderboard_html,
+        inputs=[leaderboard_data],
+        outputs=[leaderboard_html]
     )
 
     add_language_btn.click(
@@ -1223,6 +1373,18 @@ with gr.Blocks(css=css, js=js) as demo:
         fn=save_languages_file,
         inputs=[lang_json_editor],
         outputs=[result_message]
+    )
+
+    admin_toggle.click(
+        fn=toggle_admin_panel,
+        inputs=[admin_panel],
+        outputs=[admin_panel]
+    )
+    
+    set_count_btn.click(
+        fn=handle_set_count,
+        inputs=[admin_language, admin_count],
+        outputs=[leaderboard_html, leaderboard_data]
     )
 
 demo.launch()
