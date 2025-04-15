@@ -737,15 +737,24 @@ with gr.Blocks(css=css, js=js) as demo:
 
                 with gr.Accordion("About") as explanation:
                     gr.Markdown(f"""
-                    FeeL is a collaboration between Hugging Face and MIT.
-                    It is a community-driven project to provide a real-time feedback loop for LMs, where your feedback is continuously used to fine-tune the underlying models.
-                    The [dataset](https://huggingface.co/datasets/{scheduler.repo_id}), [code](https://github.com/huggingface/feel) and [models](https://huggingface.co/collections/feel-fl/feel-models-67a9b6ef0fdd554315e295e8) are public.
+                    ## Welcome to FeeL: Improving LMs for All Languages
 
-                    Chat with the model using text and images and provide feedback in different ways:
+                    **FeeL** (Feedback Loop) is a community-driven project by MIT, Hugging Face and IBM that aims to make language models better in *all languages*.
 
-                    - ✏️ Edit a message
-                    - 👍/👎 Like or dislike a message
-                    - 🔄 Regenerate a message
+                    ### Why This Matters
+                    Have you ever tried using an AI in your native language only to get responses that barely make sense? Most AI improvements prioritize widely spoken languages, while others fall behind. FeeL changes this by letting YOU shape how models respond in your language.
+
+                    ### What You Can Do
+                    1. **Select your language** from the dropdown menu (or add a new one if yours is missing)
+                    2. **Chat with the model** in your language
+                    3. **Provide feedback** on each response using:
+                       - 👍/👎 Like or dislike responses
+                       - ✏️ Edit responses to sound more natural or correct
+                       - 🔄 Regenerate to try another response
+
+                    Your feedback is directly used to fine-tune the model in real-time. The more you interact, the better the model becomes for your language community.
+
+                    All [data](https://huggingface.co/datasets/{scheduler.repo_id}), [code](https://github.com/huggingface/feel) and [models](https://huggingface.co/collections/feel-fl/feel-models-67a9b6ef0fdd554315e295e8) are publicly available for research and development.
 
                     """)
 
