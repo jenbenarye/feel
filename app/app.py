@@ -689,6 +689,11 @@ button#add-language-btn {
 .add-language-btn:hover {
     background-color: #F3C200 !important;
 }
+
+/* Yellow button styling */
+button.yellow-btn {
+    background-color: #FFD21E !important;
+}
 """
 
 def get_config(request: gr.Request):
@@ -1032,7 +1037,7 @@ with gr.Blocks(css=css, js=js) as demo:
 
                 with gr.Row():
                     load_button = gr.Button("Load Current Languages", size="sm")
-                    save_button = gr.Button("Save Changes", size="sm", elem_classes=["hf-yellow-button"])
+                    save_button = gr.Button("Save Changes", size="sm", elem_classes=["yellow-btn"])
 
                 result_message = gr.Markdown("")
 
@@ -1114,12 +1119,8 @@ with gr.Blocks(css=css, js=js) as demo:
         padding: 10px 0;
         margin-top: 5px;
     }
-    .hf-yellow-button {
+    .yellow-btn {
         background-color: #FFD21E !important;
-        color: black !important;
-    }
-    .hf-yellow-button:hover {
-        background-color: #F5C400 !important;
     }
     """
 
