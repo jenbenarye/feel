@@ -272,9 +272,40 @@ def call_pipeline(messages: list, language: str):
     """Call the appropriate model pipeline based on configuration"""
     if ZERO_GPU:
         tokenizer = CLIENT["tokenizer"]
+        # Ensure messages follow the proper alternating pattern
+        formatted_messages = []
+        prev_role = None
+
+        for msg in messages:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+
+            # Skip empty messages
+            if not content.strip():
+                continue
+
+            # Enforce alternating pattern
+            if role == prev_role:
+                # If same role repeats, combine with previous message or skip
+                continue
+
+            # Only allow "user" and "assistant" roles
+            if role not in ["user", "assistant"]:
+                # Convert to proper role or skip
+                continue
+
+            formatted_messages.append(msg)
+            prev_role = role
+
+        # Ensure we start with user message
+        if formatted_messages and formatted_messages[0]["role"] != "user":
+            formatted_messages = formatted_messages[1:]
+
+        # Now use the properly formatted messages
         formatted_prompt = tokenizer.apply_chat_template(
-            messages,
+            formatted_messages,  # Use the fixed messages
             tokenize=False,
+            add_generation_prompt=True
         )
 
         response = CLIENT["pipeline"](
@@ -702,12 +733,12 @@ def get_config(request: gr.Request):
     config = {
         "feel_consent": "false",
     }
-    
+
     if request and request.cookies:
         for key in config.keys():
             if key in request.cookies:
                 config[key] = request.cookies[key]
-                
+
     return config["feel_consent"] == "true"
 
 def initialize_consent_status(request: gr.Request):
