@@ -732,12 +732,11 @@ with gr.Blocks(css=css, js=js) as demo:
                 # Chatbot
                 ##############################
                 gr.Markdown("""
-                # ♾️ FeeL - a real-time Feedback Loop for LMs
+                # ♾️ FeeL: Improving LMs for All Languages
                 """, elem_classes=["app-title"])
 
-                with gr.Accordion("About") as explanation:
+                with gr.Accordion("") as explanation:
                     gr.Markdown(f"""
-                    ## Welcome to FeeL: Improving LMs for All Languages
 
                     **FeeL** (Feedback Loop) is a community-driven project by MIT, Hugging Face and IBM that aims to make language models better in *all languages*.
 
