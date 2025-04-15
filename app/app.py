@@ -159,12 +159,13 @@ def format_system_message(language: str, history: list):
         {
             "role": "system",
             "content": LANGUAGES.get(language, LANGUAGES["English"]),
+        },
+        {
+            "role": "assistant",
+            "content": f"Hello! I'll be speaking with you in {language}. How can I help you today?"
         }
     ]
-    if history and history[0]["role"] == "system":
-        history = history[1:]
-    history = system_message + history
-    return history
+    return system_message
 
 
 def format_history_as_messages(history: list):
@@ -771,6 +772,10 @@ with gr.Blocks(css=css, js=js) as demo:
                         {
                             "role": "system",
                             "content": LANGUAGES["English"],  # Use default language initially
+                        },
+                        {
+                            "role": "assistant",
+                            "content": "Hello! I'll be speaking with you in English. How can I help you today?"
                         }
                     ],
                     type="messages",
