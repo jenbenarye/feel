@@ -1007,22 +1007,21 @@ with gr.Blocks(css=css, js=js) as demo:
     # Add a subtle language management section at the bottom
     with gr.Row(elem_classes=["footer-section"]):
         with gr.Accordion("🔧 Admin Language Management", open=False, elem_classes=["admin-tools-accordion"]):
-            gr.Markdown("### Language File Manager")
+            # Removed the "Language File Manager" headline
 
-            # Password authentication
-            with gr.Row():
-                admin_password = gr.Textbox(
-                    type="password",
-                    label="Admin Password",
-                    placeholder="Enter admin password"
-                )
-                auth_button = gr.Button("Authenticate", size="sm")
+            # Password authentication - button below password field
+            admin_password = gr.Textbox(
+                type="password",
+                label="Admin Password",
+                placeholder="Enter admin password"
+            )
+            auth_button = gr.Button("Authenticate", size="sm")
 
             auth_status = gr.Markdown("")
 
             # File management (initially hidden)
             with gr.Group(visible=False) as lang_editor_group:
-                gr.Markdown("Edit the languages JSON file below:")
+                gr.Markdown("Edit the languages JSON file below:", elem_classes=["edit-instructions"])
 
                 # Language file editor
                 lang_json_editor = gr.Code(
@@ -1033,7 +1032,7 @@ with gr.Blocks(css=css, js=js) as demo:
 
                 with gr.Row():
                     load_button = gr.Button("Load Current Languages", size="sm")
-                    save_button = gr.Button("Save Changes", size="sm", variant="primary")
+                    save_button = gr.Button("Save Changes", size="sm", elem_classes=["hf-yellow-button"])
 
                 result_message = gr.Markdown("")
 
@@ -1110,6 +1109,17 @@ with gr.Blocks(css=css, js=js) as demo:
     .admin-tools-accordion {
         max-width: 800px;
         margin: 0 auto;
+    }
+    .edit-instructions {
+        padding: 10px 0;
+        margin-top: 5px;
+    }
+    .hf-yellow-button {
+        background-color: #FFD21E !important;
+        color: black !important;
+    }
+    .hf-yellow-button:hover {
+        background-color: #F5C400 !important;
     }
     """
 
