@@ -12,7 +12,6 @@ def set_initial_counts():
     args = parser.parse_args()
     data_file = Path("language_data_points.json")
     
-    # Load existing data if available
     if data_file.exists():
         with open(data_file, "r", encoding="utf-8") as f:
             try:
@@ -23,7 +22,6 @@ def set_initial_counts():
     else:
         data = {}
     
-    # Load available languages
     languages_file = Path("languages.json")
     if languages_file.exists():
         with open(languages_file, "r", encoding="utf-8") as f:
