@@ -682,6 +682,7 @@ def send_notification_email(contributor_data):
         return False
 
 css = """
+/* Style for the options and retry button */
 .options.svelte-pcaovb {
     display: none !important;
 }
@@ -703,7 +704,7 @@ button#add-language-btn {
     max-height: 300px;
     overflow-y: auto;
     padding: 10px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color-primary) !important;
     border-radius: 5px;
     margin-bottom: 10px;
 }
@@ -714,7 +715,7 @@ button#add-language-btn {
     left: 50% !important;
     transform: translate(-50%, -50%) !important;
     z-index: 9999 !important;
-    background: white !important;
+    background: var(--background-fill-primary) !important;
     padding: 20px !important;
     border-radius: 10px !important;
     box-shadow: 0 4px 10px rgba(0,0,0,0.2) !important;
@@ -732,9 +733,9 @@ button#add-language-btn {
     z-index: 9998 !important;
 }
 .footer-banner {
-    background-color: #f5f5f5;
+    background-color: var(--background-fill-secondary);
     padding: 10px 20px;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid var(--border-color-primary);
     margin-top: 20px;
     text-align: center;
 }
@@ -743,47 +744,61 @@ button#add-language-btn {
 }
 /* Language settings styling */
 .language-settings-header {
-    background-color: #FFD21E;  /* Hugging Face yellow */
-    padding: 5px;              /* Controls padding inside header */
+    background-color: var(--primary-500);  /* Use Gradio's primary color */
+    padding: 5px;
     border-radius: 8px 8px 0 0;
-    margin-bottom: 0;           /* Controls space below header */
-    color: #333;
+    margin-bottom: 0;
+    color: var(--body-text-color);
     font-weight: bold;
 }
 
 .language-instruction {
-    margin-top: 5px;           /* Controls space above instruction text */
-    margin-bottom: 5px;        /* Controls space below instruction text */
-    padding: 0 15px;            /* Controls left/right padding */
+    margin-top: 5px;
+    margin-bottom: 5px;
+    padding: 0 15px;
 }
 
 .language-container {
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border-color-primary);
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    margin-bottom: 20px;        /* Space below the entire container */
+    margin-bottom: 20px;
 }
 
 .language-dropdown {
-    padding: 10px 15px 20px 15px;  /* Controls padding around dropdown (top, right, bottom, left) */
+    padding: 10px 15px 20px 15px;
 }
 
 .add-language-btn {
-    background-color: #FFD21E !important;
-    color: #333 !important;
+    background-color: var(--primary-500) !important;
+    color: var(--body-text-color) !important;
     border: none !important;
     font-weight: bold !important;
     transition: background-color 0.3s !important;
 }
 
 .add-language-btn:hover {
-    background-color: #F3C200 !important;
+    background-color: var(--primary-600) !important;
 }
 
-/* Yellow button styling */
+/* Yellow button styling - now using primary color variable */
 button.yellow-btn {
-    background-color: #FFD21E !important;
+    background-color: var(--primary-500) !important;
+}
+
+.footer-section {
+    margin-top: 40px;
+    border-top: 1px solid var(--border-color-primary);
+    padding-top: 20px;
+}
+.admin-tools-accordion {
+    max-width: 800px;
+    margin: 0 auto;
+}
+.edit-instructions {
+    padding: 10px 0;
+    margin-top: 5px;
 }
 """
 
@@ -1198,25 +1213,5 @@ with gr.Blocks(css=css, js=js) as demo:
         inputs=[lang_json_editor],
         outputs=[result_message]
     )
-
-    # Add CSS for the admin section
-    css += """
-    .footer-section {
-        margin-top: 40px;
-        border-top: 1px solid #eee;
-        padding-top: 20px;
-    }
-    .admin-tools-accordion {
-        max-width: 800px;
-        margin: 0 auto;
-    }
-    .edit-instructions {
-        padding: 10px 0;
-        margin-top: 5px;
-    }
-    .yellow-btn {
-        background-color: #FFD21E !important;
-    }
-    """
 
 demo.launch()
