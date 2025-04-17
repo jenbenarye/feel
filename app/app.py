@@ -163,11 +163,22 @@ def format_system_message(language: str, history: list):
             "content": LANGUAGES.get(language, LANGUAGES["English"]),
         },
         {
-            "role": "assistant",
-            "content": f"Hello! I'll be speaking with you in {language}. How can I help you today?"
+            "role": "user",
+            "content": f"Start by asking me a question in {language}."
         }
     ]
-    return system_message
+    response = call_pipeline(system_message)
+    new_system_message = [
+        {
+            "role": "system",
+            "content": LANGUAGES.get(language, LANGUAGES["English"]),
+        },
+        {
+            "role": "assistant",
+            "content": response
+        }
+    ]
+    return new_system_message
 
 
 def format_history_as_messages(history: list):
@@ -270,7 +281,7 @@ def add_fake_like_data(
 
 
 @spaces.GPU
-def call_pipeline(messages: list, language: str):
+def call_pipeline(messages: list):
     """Call the appropriate model pipeline based on configuration"""
     if ZERO_GPU:
         tokenizer = CLIENT["tokenizer"]
@@ -339,7 +350,7 @@ def respond(
     messages = format_history_as_messages(history)
 
     if ZERO_GPU:
-        content = call_pipeline(messages, language)
+        content = call_pipeline(messages)
     else:
         response = CLIENT.chat.completions.create(
             messages=messages,
