@@ -326,6 +326,8 @@ def call_pipeline(messages: list):
             clean_up_tokenization_spaces=False,
             max_length=2000,
             return_full_text=False,
+            temperature=0.7,
+            do_sample=True,
         )
 
         return response[0]["generated_text"]
