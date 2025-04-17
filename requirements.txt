@@ -108,3 +108,4 @@ yarl==1.18.3
 bitsandbytes==0.45.3
 accelerate>=0.26.0
 gradio>=5.23.1
+sendgrid>=6.10.0
