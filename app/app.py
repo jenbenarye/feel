@@ -568,15 +568,23 @@ def save_new_language(lang_name, system_prompt):
 
 def save_contributor_email(email, name=""):
     """Save contributor email to persistent storage and send notification to admins"""
+    print(f"[DEBUG] Starting save_contributor_email for: {email}, {name}")
+
     # Still save to persistent storage for record keeping
     emails_path, use_persistent = get_persistent_storage_path("contributors.json")
+    print(f"[DEBUG] Using path: {emails_path}, persistent: {use_persistent}")
 
     # Read existing emails
-    if emails_path.exists():
-        with open(emails_path, "r", encoding="utf-8") as f:
-            contributors = json.load(f)
-    else:
-        contributors = []
+    contributors = []
+    try:
+        if emails_path.exists():
+            with open(emails_path, "r", encoding="utf-8") as f:
+                contributors = json.load(f)
+                print(f"[DEBUG] Loaded {len(contributors)} existing contributors")
+        else:
+            print(f"[DEBUG] No existing contributors file found at {emails_path}")
+    except Exception as e:
+        print(f"[DEBUG] Error reading contributors file: {e}")
 
     # Add new email with timestamp
     contributor_data = {
@@ -585,17 +593,29 @@ def save_contributor_email(email, name=""):
         "timestamp": datetime.now().isoformat()
     }
     contributors.append(contributor_data)
+    print(f"[DEBUG] Added new contributor data: {contributor_data}")
 
     # Save back to file
-    with open(emails_path, "w", encoding="utf-8") as f:
-        json.dump(contributors, f, ensure_ascii=False, indent=2)
+    try:
+        with open(emails_path, "w", encoding="utf-8") as f:
+            json.dump(contributors, f, ensure_ascii=False, indent=2)
+            print(f"[DEBUG] Successfully saved contributors file with {len(contributors)} entries")
+    except Exception as e:
+        print(f"[DEBUG] Error saving contributors file: {e}")
 
     # Send email notification to admins
+    print(f"[DEBUG] Attempting to send notification email")
     try:
         send_notification_email(contributor_data)
+        print(f"[DEBUG] Successfully sent notification email")
         return True
     except Exception as e:
-        print(f"Failed to send notification email: {e}")
+        print(f"[DEBUG] Failed to send notification email: {e}")
+        print(f"[DEBUG] Error type: {type(e).__name__}")
+        if hasattr(e, 'args'):
+            print(f"[DEBUG] Error args: {e.args}")
+        import traceback
+        print(f"[DEBUG] Full traceback: {traceback.format_exc()}")
         return False
 
 def send_notification_email(contributor_data):
@@ -607,38 +627,81 @@ def send_notification_email(contributor_data):
     sender_password = os.getenv("NOTIFICATION_EMAIL_PASSWORD", "")
     recipient_email = os.getenv("ADMIN_EMAIL", "leshem@mit.edu")
 
+    print(f"[DEBUG] Email configuration:")
+    print(f"[DEBUG] - SMTP Server: {smtp_server}")
+    print(f"[DEBUG] - SMTP Port: {smtp_port}")
+    print(f"[DEBUG] - Sender Email: {sender_email}")
+    print(f"[DEBUG] - Password Set: {'Yes' if sender_password else 'No'}")
+    print(f"[DEBUG] - Recipient Email: {recipient_email}")
+
     # If no password is set, log instead of sending
     if not sender_password:
-        print(f"Would send notification email about contributor: {contributor_data}")
+        print(f"[DEBUG] No password set, would send notification email about contributor: {contributor_data}")
         return
 
     # Create message
-    message = MIMEMultipart("alternative")
-    message["Subject"] = "New FeeL Contributor Submission"
-    message["From"] = sender_email
-    message["To"] = recipient_email
+    try:
+        print(f"[DEBUG] Creating email message")
+        message = MIMEMultipart("alternative")
+        message["Subject"] = "New FeeL Contributor Submission"
+        message["From"] = sender_email
+        message["To"] = recipient_email
 
-    # Create HTML content
-    html = f"""
-    <html>
-    <body>
-        <h2>New FeeL Contributor Submission</h2>
-        <p><strong>Name:</strong> {contributor_data.get('name', 'Not provided')}</p>
-        <p><strong>Email:</strong> {contributor_data.get('email', 'Not provided')}</p>
-        <p><strong>Timestamp:</strong> {contributor_data.get('timestamp', datetime.now().isoformat())}</p>
-    </body>
-    </html>
-    """
+        # Create HTML content
+        html = f"""
+        <html>
+        <body>
+            <h2>New FeeL Contributor Submission</h2>
+            <p><strong>Name:</strong> {contributor_data.get('name', 'Not provided')}</p>
+            <p><strong>Email:</strong> {contributor_data.get('email', 'Not provided')}</p>
+            <p><strong>Timestamp:</strong> {contributor_data.get('timestamp', datetime.now().isoformat())}</p>
+        </body>
+        </html>
+        """
 
-    # Attach HTML content
-    message.attach(MIMEText(html, "html"))
+        # Attach HTML content
+        message.attach(MIMEText(html, "html"))
+        print(f"[DEBUG] Message created successfully")
+    except Exception as e:
+        print(f"[DEBUG] Error creating email message: {e}")
+        raise
 
     # Send email
+    print(f"[DEBUG] Creating SSL context")
     context = ssl.create_default_context()
-    with smtplib.SMTP(smtp_server, smtp_port) as server:
-        server.starttls(context=context)
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, recipient_email, message.as_string())
+
+    try:
+        print(f"[DEBUG] Connecting to SMTP server: {smtp_server}:{smtp_port}")
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            print(f"[DEBUG] Connected to SMTP server")
+
+            print(f"[DEBUG] Starting TLS")
+            server.starttls(context=context)
+            print(f"[DEBUG] TLS started")
+
+            print(f"[DEBUG] Logging in with {sender_email}")
+            server.login(sender_email, sender_password)
+            print(f"[DEBUG] Login successful")
+
+            print(f"[DEBUG] Sending email from {sender_email} to {recipient_email}")
+            server.sendmail(sender_email, recipient_email, message.as_string())
+            print(f"[DEBUG] Email sent successfully")
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"[DEBUG] SMTP Authentication Error: {e}")
+        print(f"[DEBUG] This likely means your username or password is incorrect")
+        raise
+    except smtplib.SMTPConnectError as e:
+        print(f"[DEBUG] SMTP Connection Error: {e}")
+        print(f"[DEBUG] This likely means the server address or port is incorrect, or the server is not accessible")
+        raise
+    except smtplib.SMTPException as e:
+        print(f"[DEBUG] SMTP Error: {e}")
+        raise
+    except Exception as e:
+        print(f"[DEBUG] Unexpected error during email sending: {e}")
+        import traceback
+        print(f"[DEBUG] Full traceback: {traceback.format_exc()}")
+        raise
 
 css = """
 .options.svelte-pcaovb {
