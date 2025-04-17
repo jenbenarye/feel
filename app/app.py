@@ -928,7 +928,12 @@ with gr.Blocks(css=css, js=js) as demo:
                 with gr.Group(visible=False) as add_language_modal:
                     gr.Markdown("### Add New Language")
                     new_lang_name = gr.Textbox(label="Language Name", lines=1)
-                    new_system_prompt = gr.Textbox(label="System Prompt", lines=4)
+                    new_system_prompt = gr.Textbox(
+                        label="System Prompt",
+                        lines=4,
+                        placeholder="Write in your own language: \"You are a helpful assistant. Always respond to requests in fluent and natural [your language], regardless of the language used by the user.\"",
+                        info="The system prompt tells the AI how to behave. Make sure to write it in the language you're adding so the AI knows how to respond naturally."
+                    )
                     with gr.Row():
                         save_language_btn = gr.Button("Save")
                         cancel_language_btn = gr.Button("Cancel")
