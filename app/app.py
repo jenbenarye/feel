@@ -11,6 +11,7 @@ from mimetypes import guess_type
 from pathlib import Path
 from typing import Optional
 import json
+import socket
 
 import spaces
 import spaces
@@ -672,9 +673,11 @@ def send_notification_email(contributor_data):
 
     try:
         print(f"[DEBUG] Connecting to SMTP server: {smtp_server}:{smtp_port}")
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            print(f"[DEBUG] Connected to SMTP server")
+        # Add timeout to prevent hanging
+        server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
+        print(f"[DEBUG] Connected to SMTP server")
 
+        try:
             print(f"[DEBUG] Starting TLS")
             server.starttls(context=context)
             print(f"[DEBUG] TLS started")
@@ -686,6 +689,16 @@ def send_notification_email(contributor_data):
             print(f"[DEBUG] Sending email from {sender_email} to {recipient_email}")
             server.sendmail(sender_email, recipient_email, message.as_string())
             print(f"[DEBUG] Email sent successfully")
+        finally:
+            # Always close the connection
+            server.quit()
+            print(f"[DEBUG] SMTP connection closed")
+
+    except socket.timeout:
+        print(f"[DEBUG] Connection to SMTP server timed out after 10 seconds")
+        print(f"[DEBUG] This likely means the SMTP server is not accessible from your environment")
+        # Log the submission instead of raising an exception
+        print(f"[DEBUG] Would have sent email about: {contributor_data}")
     except smtplib.SMTPAuthenticationError as e:
         print(f"[DEBUG] SMTP Authentication Error: {e}")
         print(f"[DEBUG] This likely means your username or password is incorrect")
