@@ -156,7 +156,7 @@ def add_user_message(history, message):
     return history, gr.Textbox(value=None, interactive=False)
 
 
-def format_system_message(language: str, history: list):
+def format_system_message(language: str):
     system_message = [
         {
             "role": "system",
@@ -884,16 +884,7 @@ with gr.Blocks(css=css, js=js) as demo:
                 chatbot = gr.Chatbot(
                     elem_id="chatbot",
                     editable="all",
-                    value=[
-                        {
-                            "role": "system",
-                            "content": LANGUAGES["English"],  # Use default language initially
-                        },
-                        {
-                            "role": "assistant",
-                            "content": "Hello! I'll be speaking with you in English. How can I help you today?"
-                        }
-                    ],
+                    value=format_system_message("English"),
                     type="messages",
                     feedback_options=["Like", "Dislike"],
                     height=600
@@ -1071,7 +1062,7 @@ with gr.Blocks(css=css, js=js) as demo:
 
     language_dropdown.change(
         fn=format_system_message,
-        inputs=[language_dropdown, chatbot],
+        inputs=[language_dropdown],
         outputs=[chatbot],
     ).then(
         fn=lambda x: x,  # Update the language state
