@@ -11,7 +11,8 @@ from mimetypes import guess_type
 from pathlib import Path
 from typing import Optional
 import json
-import socket
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 import spaces
 import spaces
@@ -620,36 +621,25 @@ def save_contributor_email(email, name=""):
         return False
 
 def send_notification_email(contributor_data):
-    """Send email notification to admins about new contributor"""
-    # Get email configuration from environment variables
-    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    sender_email = os.getenv("NOTIFICATION_EMAIL", "noreply@example.com")
-    sender_password = os.getenv("NOTIFICATION_EMAIL_PASSWORD", "")
-    recipient_email = os.getenv("ADMIN_EMAIL", "leshem@mit.edu")
+    """Send email notification to admins about new contributor using SendGrid API"""
+    # Get configuration from environment variables
+    sender_email = os.getenv("NOTIFICATION_EMAIL", "feel.notifications@gmail.com")
+    recipient_email = os.getenv("ADMIN_EMAIL", "jen_ben@mit.edu")
+    sendgrid_api_key = os.getenv("SENDGRID_API_KEY", "")
 
     print(f"[DEBUG] Email configuration:")
-    print(f"[DEBUG] - SMTP Server: {smtp_server}")
-    print(f"[DEBUG] - SMTP Port: {smtp_port}")
     print(f"[DEBUG] - Sender Email: {sender_email}")
-    print(f"[DEBUG] - Password Set: {'Yes' if sender_password else 'No'}")
     print(f"[DEBUG] - Recipient Email: {recipient_email}")
+    print(f"[DEBUG] - API Key Set: {'Yes' if sendgrid_api_key else 'No'}")
 
-    # If no password is set, log instead of sending
-    if not sender_password:
-        print(f"[DEBUG] No password set, would send notification email about contributor: {contributor_data}")
-        return
+    # If no API key is set, log instead of sending
+    if not sendgrid_api_key:
+        print(f"[DEBUG] No SendGrid API key set, would send notification email about contributor: {contributor_data}")
+        return False
 
-    # Create message
     try:
-        print(f"[DEBUG] Creating email message")
-        message = MIMEMultipart("alternative")
-        message["Subject"] = "New FeeL Contributor Submission"
-        message["From"] = sender_email
-        message["To"] = recipient_email
-
-        # Create HTML content
-        html = f"""
+        # Create message content
+        html_content = f"""
         <html>
         <body>
             <h2>New FeeL Contributor Submission</h2>
@@ -660,61 +650,36 @@ def send_notification_email(contributor_data):
         </html>
         """
 
-        # Attach HTML content
-        message.attach(MIMEText(html, "html"))
-        print(f"[DEBUG] Message created successfully")
+        # Create mail message
+        print(f"[DEBUG] Creating email message")
+        message = Mail(
+            from_email=sender_email,
+            to_emails=recipient_email,
+            subject='New FeeL Contributor Submission',
+            html_content=html_content
+        )
+
+        # Send via API
+        print(f"[DEBUG] Sending via SendGrid API")
+        sg = SendGridAPIClient(sendgrid_api_key)
+        response = sg.send(message)
+
+        print(f"[DEBUG] SendGrid API response code: {response.status_code}")
+
+        # 202 is success for SendGrid
+        if response.status_code == 202:
+            print(f"[DEBUG] Email sent successfully via SendGrid API")
+            return True
+        else:
+            print(f"[DEBUG] SendGrid API returned non-success status code: {response.status_code}")
+            print(f"[DEBUG] Response body: {response.body}")
+            return False
+
     except Exception as e:
-        print(f"[DEBUG] Error creating email message: {e}")
-        raise
-
-    # Send email
-    print(f"[DEBUG] Creating SSL context")
-    context = ssl.create_default_context()
-
-    try:
-        print(f"[DEBUG] Connecting to SMTP server: {smtp_server}:{smtp_port}")
-        # Add timeout to prevent hanging
-        server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
-        print(f"[DEBUG] Connected to SMTP server")
-
-        try:
-            print(f"[DEBUG] Starting TLS")
-            server.starttls(context=context)
-            print(f"[DEBUG] TLS started")
-
-            print(f"[DEBUG] Logging in with {sender_email}")
-            server.login(sender_email, sender_password)
-            print(f"[DEBUG] Login successful")
-
-            print(f"[DEBUG] Sending email from {sender_email} to {recipient_email}")
-            server.sendmail(sender_email, recipient_email, message.as_string())
-            print(f"[DEBUG] Email sent successfully")
-        finally:
-            # Always close the connection
-            server.quit()
-            print(f"[DEBUG] SMTP connection closed")
-
-    except socket.timeout:
-        print(f"[DEBUG] Connection to SMTP server timed out after 10 seconds")
-        print(f"[DEBUG] This likely means the SMTP server is not accessible from your environment")
-        # Log the submission instead of raising an exception
-        print(f"[DEBUG] Would have sent email about: {contributor_data}")
-    except smtplib.SMTPAuthenticationError as e:
-        print(f"[DEBUG] SMTP Authentication Error: {e}")
-        print(f"[DEBUG] This likely means your username or password is incorrect")
-        raise
-    except smtplib.SMTPConnectError as e:
-        print(f"[DEBUG] SMTP Connection Error: {e}")
-        print(f"[DEBUG] This likely means the server address or port is incorrect, or the server is not accessible")
-        raise
-    except smtplib.SMTPException as e:
-        print(f"[DEBUG] SMTP Error: {e}")
-        raise
-    except Exception as e:
-        print(f"[DEBUG] Unexpected error during email sending: {e}")
+        print(f"[DEBUG] Error in send_notification_email: {e}")
         import traceback
         print(f"[DEBUG] Full traceback: {traceback.format_exc()}")
-        raise
+        return False
 
 css = """
 .options.svelte-pcaovb {
