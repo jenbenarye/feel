@@ -907,36 +907,36 @@ button.yellow-btn {
 }
 """
 
+
 def get_config(request: gr.Request):
     """Get configuration from cookies"""
-    config = {"feel_consent": False}
-    if request and 'feel_consent' in request.cookies:
-        config["feel_consent"] = request.cookies['feel_consent'] == 'true'
-    return config["feel_consent"]
+    config = {
+        "feel_consent": "false",
+    }
+
+    if request and request.cookies:
+        for key in config.keys():
+            if key in request.cookies:
+                config[key] = request.cookies[key]
+
+    return config["feel_consent"] == "true"
+
+def initialize_consent_status(request: gr.Request):
+    """Initialize consent status and language preference from cookies"""
+    has_consent = get_config(request)
+    return has_consent
 
 js = '''function js(){
     window.set_cookie = function(key, value){
-        console.log('Setting cookie:', key, value);
-        document.cookie = key+'='+value+'; Path=/; SameSite=Strict; max-age=31536000';  // 1 year expiry
-        console.log('Current cookies:', document.cookie);
-        return [value]
-    }
-    
-    window.check_cookie = function(key){
-        console.log('Checking cookie:', key);
-        console.log('All cookies:', document.cookie);
-        const value = document.cookie.split('; ').find(row => row.startsWith(key + '='))?.split('=')[1];
-        console.log('Found value:', value);
-        return [value === 'true']
+        document.cookie = key+'='+value+'; Path=/; SameSite=Strict';
+        return [value];
     }
 }'''
 
 
-
-
 with gr.Blocks(css=css, js=js) as demo:
-    # State variable to track if user has consented
-    user_consented = gr.State(value=False)  
+    user_consented = gr.State(value=False)
+    language = gr.State(value="English")  # Default language state
     leaderboard_data = gr.State([])
     
     # Landing page with user agreement
@@ -1021,36 +1021,36 @@ with gr.Blocks(css=css, js=js) as demo:
                         elem_classes=["add-language-btn"]
                     )
 
-            # Right column with leaderboard
-            with gr.Column(scale=3, elem_classes=["leaderboard-container"]):
-                gr.Markdown("# Language Leaderboard", elem_classes=["leaderboard-title"])
-                leaderboard_html = gr.HTML("Loading leaderboard...")
-                
-                with gr.Accordion("Admin Controls", open=False, visible=False) as admin_panel:
-                    with gr.Row():
-                        admin_language = gr.Dropdown(choices=list(LANGUAGES.keys()), label="Language")
-                        admin_count = gr.Number(value=0, label="Data Points")
-                    set_count_btn = gr.Button("Set Count")
+                # Right column with leaderboard
+                with gr.Column(scale=3, elem_classes=["leaderboard-container"]):
+                    gr.Markdown("# Language Leaderboard", elem_classes=["leaderboard-title"])
+                    leaderboard_html = gr.HTML("Loading leaderboard...")
                     
-                # toggle button for admin panel?
-                admin_toggle = gr.Button("Admin Controls", visible=True)
+                    with gr.Accordion("Admin Controls", open=False, visible=False) as admin_panel:
+                        with gr.Row():
+                            admin_language = gr.Dropdown(choices=list(LANGUAGES.keys()), label="Language")
+                            admin_count = gr.Number(value=0, label="Data Points")
+                        set_count_btn = gr.Button("Set Count")
+                        
+                    # toggle button for admin panel?
+                    admin_toggle = gr.Button("Admin Controls", visible=True)
 
-            # update leaderboard HTML
-            def update_leaderboard_html(data):
-                if not data:
-                    return "Loading leaderboard..."
-                
-                html = "<div class='leaderboard-content'>"
-                for idx, (lang, count) in enumerate(data):
-                    html += f"""
-                    <div class='leaderboard-item'>
-                        <span class='leaderboard-rank'>#{idx+1}</span>
-                        <span class='leaderboard-language'>{lang}</span>
-                        <span class='leaderboard-count'>{count}</span>
-                    </div>
-                    """
-                html += "</div>"
-                return html
+                # update leaderboard HTML
+                def update_leaderboard_html(data):
+                    if not data:
+                        return "Loading leaderboard..."
+                    
+                    html = "<div class='leaderboard-content'>"
+                    for idx, (lang, count) in enumerate(data):
+                        html += f"""
+                        <div class='leaderboard-item'>
+                            <span class='leaderboard-rank'>#{idx+1}</span>
+                            <span class='leaderboard-language'>{lang}</span>
+                            <span class='leaderboard-count'>{count}</span>
+                        </div>
+                        """
+                    html += "</div>"
+                    return html
 
 
                 # Create a hidden group instead of a modal
