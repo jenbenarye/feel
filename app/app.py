@@ -169,7 +169,7 @@ def format_system_message(language: str):
             "content": f"Start by asking me a question in {language}."
         }
     ]
-    response = call_pipeline(system_message)
+    response = call_pipeline(system_message, temperature=1.0)
     new_system_message = [
         {
             "role": "system",
@@ -283,7 +283,7 @@ def add_fake_like_data(
 
 
 @spaces.GPU
-def call_pipeline(messages: list):
+def call_pipeline(messages: list, temperature: float = 0.7):
     """Call the appropriate model pipeline based on configuration"""
     if ZERO_GPU:
         tokenizer = CLIENT["tokenizer"]
@@ -328,7 +328,7 @@ def call_pipeline(messages: list):
             clean_up_tokenization_spaces=False,
             max_length=2000,
             return_full_text=False,
-            temperature=0.7,
+            temperature=temperature,
             do_sample=True,
         )
 
@@ -338,6 +338,7 @@ def call_pipeline(messages: list):
             messages,
             clean_up_tokenization_spaces=False,
             max_length=2000,
+            temperature=temperature,
         )
         return response[0]["generated_text"][-1]["content"]
 
@@ -353,15 +354,18 @@ def respond(
     Return the history with the new message"""
     messages = format_history_as_messages(history)
 
+    # Use provided temperature or default to 0.7
+    temp = temperature if temperature is not None else 0.7
+
     if ZERO_GPU:
-        content = call_pipeline(messages)
+        content = call_pipeline(messages, temperature=temp)
     else:
         response = CLIENT.chat.completions.create(
             messages=messages,
             max_tokens=2000,
             stream=False,
             seed=seed,
-            temperature=temperature,
+            temperature=temp,
         )
         content = response.choices[0].message.content
 
@@ -553,7 +557,7 @@ def set_language_data_points(language, count):
 def load_initial_language_data():
     """Load initial language data points from persistent storage or default values"""
     data_points_path, use_persistent = get_persistent_storage_path("language_data_points.json")
-    
+
     if data_points_path.exists():
         try:
             with open(data_points_path, "r", encoding="utf-8") as f:
@@ -563,17 +567,17 @@ def load_initial_language_data():
                     LANGUAGE_DATA_POINTS.update(data)
         except Exception as e:
             print(f"Error loading language data points: {e}")
-    
+
     for lang in LANGUAGES.keys():
         if lang not in LANGUAGE_DATA_POINTS:
             LANGUAGE_DATA_POINTS[lang] = 0
-            
+
     return get_leaderboard_data()
 
 def save_language_data_points():
     """Save language data points to persistent storage"""
     data_points_path, use_persistent = get_persistent_storage_path("language_data_points.json")
-    
+
     try:
         with language_data_lock:
             with open(data_points_path, "w", encoding="utf-8") as f:
@@ -601,7 +605,7 @@ def submit_conversation(dataframe, conversation_id, session_id, language):
     save_feedback(input_object=conversation_data)
     leaderboard_data = increment_language_data_point(language)
     save_language_data_points()
-    
+
     return (gr.Dataframe(value=None, interactive=False), [], leaderboard_data)
 
 
@@ -938,7 +942,7 @@ with gr.Blocks(css=css, js=js) as demo:
     user_consented = gr.State(value=False)
     language = gr.State(value="English")  # Default language state
     leaderboard_data = gr.State([])
-    
+
     # Main application interface (initially hidden)
     with gr.Group() as main_app:
         with gr.Row():
@@ -1018,13 +1022,13 @@ with gr.Blocks(css=css, js=js) as demo:
                 with gr.Column(scale=3, elem_classes=["leaderboard-container"]):
                     gr.Markdown("# Language Leaderboard", elem_classes=["leaderboard-title"])
                     leaderboard_html = gr.HTML("Loading leaderboard...")
-                    
+
                     with gr.Accordion("Admin Controls", open=False, visible=False) as admin_panel:
                         with gr.Row():
                             admin_language = gr.Dropdown(choices=list(LANGUAGES.keys()), label="Language")
                             admin_count = gr.Number(value=0, label="Data Points")
                         set_count_btn = gr.Button("Set Count")
-                        
+
                     # toggle button for admin panel?
                     admin_toggle = gr.Button("Admin Controls", visible=True)
 
@@ -1032,7 +1036,7 @@ with gr.Blocks(css=css, js=js) as demo:
                 def update_leaderboard_html(data):
                     if not data:
                         return "Loading leaderboard..."
-                    
+
                     html = "<div class='leaderboard-content'>"
                     for idx, (lang, count) in enumerate(data):
                         html += f"""
@@ -1255,20 +1259,20 @@ with gr.Blocks(css=css, js=js) as demo:
         default_language = language_choices[0] if language_choices else "English"
 
         return str(uuid.uuid4()), gr.Dropdown(choices=language_choices, value=default_language), default_language
-    
+
     def toggle_admin_panel(visible):
         return gr.Accordion(visible=not visible)
-    
+
     def handle_set_count(language, count):
         updated_data = set_language_data_points(language, int(count))
         save_language_data_points()
         return update_leaderboard_html(updated_data), updated_data
-    
+
     demo.load(
         fn=lambda: (on_app_load(), load_initial_language_data()),
         inputs=None,
         outputs=[
-            session_id, 
+            session_id,
             language,
             leaderboard_data
         ]
@@ -1373,7 +1377,7 @@ with gr.Blocks(css=css, js=js) as demo:
         inputs=[admin_panel],
         outputs=[admin_panel]
     )
-    
+
     set_count_btn.click(
         fn=handle_set_count,
         inputs=[admin_language, admin_count],
