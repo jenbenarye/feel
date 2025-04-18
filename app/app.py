@@ -1252,13 +1252,18 @@ with gr.Blocks(css=css, js=js) as demo:
         outputs=[conversation_id],
     )
 
-    def on_app_load():
+    def initialize_app():
+        """Initialize the app with session ID, language, and leaderboard data"""
         global LANGUAGES
         LANGUAGES = load_languages()
         language_choices = list(LANGUAGES.keys())
         default_language = language_choices[0] if language_choices else "English"
 
-        return str(uuid.uuid4()), gr.Dropdown(choices=language_choices, value=default_language), default_language
+        # Load initial leaderboard data
+        leaderboard = load_initial_language_data()
+
+        # Return exactly 3 values as expected
+        return str(uuid.uuid4()), default_language, leaderboard
 
     def toggle_admin_panel(visible):
         return gr.Accordion(visible=not visible)
@@ -1269,7 +1274,7 @@ with gr.Blocks(css=css, js=js) as demo:
         return update_leaderboard_html(updated_data), updated_data
 
     demo.load(
-        fn=lambda: (on_app_load(), load_initial_language_data()),
+        fn=initialize_app,
         inputs=None,
         outputs=[
             session_id,
