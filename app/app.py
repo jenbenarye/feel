@@ -159,6 +159,9 @@ def add_user_message(history, message):
 
 
 def format_system_message(language: str):
+    # Use a higher temperature with randomization for more diversity
+    random_temp = random.uniform(1.3, 2.0)  # More random between 1.3 and 2.0
+
     system_message = [
         {
             "role": "system",
@@ -169,7 +172,8 @@ def format_system_message(language: str):
             "content": f"Start by asking me a question in {language}."
         }
     ]
-    response = call_pipeline(system_message, temperature=1.0)
+    response = call_pipeline(system_message, temperature=random_temp)
+
     new_system_message = [
         {
             "role": "system",
@@ -285,6 +289,8 @@ def add_fake_like_data(
 @spaces.GPU
 def call_pipeline(messages: list, temperature: float = 0.7):
     """Call the appropriate model pipeline based on configuration"""
+
+
     if ZERO_GPU:
         tokenizer = CLIENT["tokenizer"]
         # Ensure messages follow the proper alternating pattern
@@ -330,6 +336,7 @@ def call_pipeline(messages: list, temperature: float = 0.7):
             return_full_text=False,
             temperature=temperature,
             do_sample=True,
+            top_p=0.9,  # Add top_p sampling for more diversity
         )
 
         return response[0]["generated_text"]
@@ -522,12 +529,16 @@ def wrangle_retry_data(
         language=language,
     )
 
+    # Use randomized temperature for more varied responses when retrying
+    random_temp = random.randint(70, 150) / 100  # Between 0.7 and 1.5
+    random_seed = random.randint(0, 1000000)
+
     # Return the history without a new message
     history = respond(
         history=history[:-1],
         language=language,
-        temperature=random.randint(1, 100) / 100,
-        seed=random.randint(0, 1000000),
+        temperature=random_temp,
+        seed=random_seed,
     )
     return history, update_dataframe(dataframe, history)
 
