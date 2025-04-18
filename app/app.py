@@ -939,13 +939,6 @@ with gr.Blocks(css=css, js=js) as demo:
     language = gr.State(value="English")  # Default language state
     leaderboard_data = gr.State([])
     
-    # Landing page with user agreement
-    with gr.Group(visible=True) as landing_page:
-        gr.Markdown("# Welcome to FeeL")
-        with gr.Group(elem_classes=["user-agreement-container"]):
-            gr.Markdown(USER_AGREEMENT)
-        consent_btn = gr.Button("I agree")
-    
     # Main application interface (initially hidden)
     with gr.Group() as main_app:
         with gr.Row():
