@@ -1157,244 +1157,257 @@ with gr.Blocks(css=css, js=js) as demo:
                 submit_email_btn = gr.Button("Submit")
                 email_submit_status = gr.Markdown("")
 
-        # Admin tools section (keep this part)
+        # Admin tools section - Add some content to this block
         with gr.Accordion("🔧 Admin Language Management", open=False, elem_classes=["admin-tools-accordion"]):
-            # ... existing admin tools code ...
+            gr.Markdown("Admin tools for language management")
+            # Add any existing admin tools here
+            # For example:
+            admin_password = gr.Textbox(type="password", label="Admin Password", visible=True)
+            auth_button = gr.Button("Authenticate")
+            auth_status = gr.Markdown("")
 
-    # Check consent on page load and show/hide components appropriately
-    def initialize_consent_status():
-        # This function will be called when the app loads
-        return False  # Default to not consented
+            with gr.Group(visible=False) as lang_editor_group:
+                gr.Markdown("### Edit Languages")
+                lang_json_editor = gr.TextArea(label="Languages JSON", lines=10)
+                with gr.Row():
+                    load_button = gr.Button("Load Languages")
+                    save_button = gr.Button("Save Languages")
+                result_message = gr.Markdown("")
 
-    def update_visibility(has_consent):
-        # Show/hide components based on consent status
-        return (
-            gr.Group(visible=has_consent),  # main_app
-            gr.Group(visible=not has_consent),  # consent_overlay
-            gr.Group(visible=not has_consent),  # consent_modal
-            gr.Group(visible=has_consent)   # footer_section
-        )
+# Now define the function (properly outside the with blocks)
+def initialize_consent_status():
+    # This function will be called when the app loads
+    return False  # Default to not consented
 
-    # Initialize app with consent checking
-    demo.load(
-        fn=initialize_consent_status,
-        outputs=user_consented,
-        js=js
-    ).then(
-        fn=update_visibility,
-        inputs=user_consented,
-        outputs=[main_app, consent_overlay, consent_modal, footer_section]
+def update_visibility(has_consent):
+    # Show/hide components based on consent status
+    return (
+        gr.Group(visible=has_consent),  # main_app
+        gr.Group(visible=not has_consent),  # consent_overlay
+        gr.Group(visible=not has_consent),  # consent_modal
+        gr.Group(visible=has_consent)   # footer_section
     )
 
-    # Update the consent button click handler
-    consent_btn.click(
-        fn=lambda: True,
-        outputs=user_consented,
-        js="() => set_cookie('feel_consent', 'true')"
-    ).then(
-        fn=update_visibility,
-        inputs=user_consented,
-        outputs=[main_app, consent_overlay, consent_modal, footer_section]
-    )
+# Initialize app with consent checking
+demo.load(
+    fn=initialize_consent_status,
+    outputs=user_consented,
+    js=js
+).then(
+    fn=update_visibility,
+    inputs=user_consented,
+    outputs=[main_app, consent_overlay, consent_modal, footer_section]
+)
 
-    ##############################
-    # Deal with feedback
-    ##############################
+# Update the consent button click handler
+consent_btn.click(
+    fn=lambda: True,
+    outputs=user_consented,
+    js="() => set_cookie('feel_consent', 'true')"
+).then(
+    fn=update_visibility,
+    inputs=user_consented,
+    outputs=[main_app, consent_overlay, consent_modal, footer_section]
+)
 
-    language_dropdown.change(
-        fn=format_system_message,
-        inputs=[language_dropdown],
-        outputs=[chatbot],
-    ).then(
-        fn=lambda x: x,  # Update the language state
-        inputs=[language_dropdown],
-        outputs=[language]
-    )
+##############################
+# Deal with feedback
+##############################
 
-    chat_input.submit(
-        fn=add_user_message,
-        inputs=[chatbot, chat_input],
-        outputs=[chatbot, chat_input],
-    ).then(respond, inputs=[chatbot, language], outputs=[chatbot]).then(
-        lambda: gr.Textbox(interactive=True), None, [chat_input]
-    ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe]).then(
-        submit_conversation,
-        inputs=[dataframe, conversation_id, session_id, language],
-        outputs=[dataframe, chatbot, leaderboard_data]
-    ).then(
-        update_leaderboard_html,
-        inputs=[leaderboard_data],
-        outputs=[leaderboard_html]
-    )
+language_dropdown.change(
+    fn=format_system_message,
+    inputs=[language_dropdown],
+    outputs=[chatbot],
+).then(
+    fn=lambda x: x,  # Update the language state
+    inputs=[language_dropdown],
+    outputs=[language]
+)
 
-    chatbot.like(
-        fn=wrangle_like_data,
-        inputs=[chatbot],
-        outputs=[chatbot, dataframe],
-        like_user_message=False,
-    ).then(
-        submit_conversation,
-        inputs=[dataframe, conversation_id, session_id, language],
-    )
+chat_input.submit(
+    fn=add_user_message,
+    inputs=[chatbot, chat_input],
+    outputs=[chatbot, chat_input],
+).then(respond, inputs=[chatbot, language], outputs=[chatbot]).then(
+    lambda: gr.Textbox(interactive=True), None, [chat_input]
+).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe]).then(
+    submit_conversation,
+    inputs=[dataframe, conversation_id, session_id, language],
+    outputs=[dataframe, chatbot, leaderboard_data]
+).then(
+    update_leaderboard_html,
+    inputs=[leaderboard_data],
+    outputs=[leaderboard_html]
+)
 
-    chatbot.retry(
-        fn=wrangle_retry_data,
-        inputs=[chatbot, dataframe, conversation_id, session_id, language],
-        outputs=[chatbot, dataframe],
-    )
+chatbot.like(
+    fn=wrangle_like_data,
+    inputs=[chatbot],
+    outputs=[chatbot, dataframe],
+    like_user_message=False,
+).then(
+    submit_conversation,
+    inputs=[dataframe, conversation_id, session_id, language],
+)
 
-    chatbot.edit(
-        fn=wrangle_edit_data,
-        inputs=[chatbot, dataframe, conversation_id, session_id, language],
-        outputs=[chatbot],
-    ).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe])
+chatbot.retry(
+    fn=wrangle_retry_data,
+    inputs=[chatbot, dataframe, conversation_id, session_id, language],
+    outputs=[chatbot, dataframe],
+)
 
-    gr.on(
-        triggers=[submit_btn.click, chatbot.clear],
-        fn=submit_conversation,
-        inputs=[dataframe, conversation_id, session_id, language],
-        outputs=[dataframe, chatbot],
-    ).then(
-        fn=lambda x: str(uuid.uuid4()),
-        inputs=[conversation_id],
-        outputs=[conversation_id],
-    )
+chatbot.edit(
+    fn=wrangle_edit_data,
+    inputs=[chatbot, dataframe, conversation_id, session_id, language],
+    outputs=[chatbot],
+).then(update_dataframe, inputs=[dataframe, chatbot], outputs=[dataframe])
 
-    def initialize_app():
-        """Initialize the app with session ID, language, and leaderboard data"""
-        global LANGUAGES
-        LANGUAGES = load_languages()
-        language_choices = list(LANGUAGES.keys())
-        default_language = language_choices[0] if language_choices else "English"
+gr.on(
+    triggers=[submit_btn.click, chatbot.clear],
+    fn=submit_conversation,
+    inputs=[dataframe, conversation_id, session_id, language],
+    outputs=[dataframe, chatbot],
+).then(
+    fn=lambda x: str(uuid.uuid4()),
+    inputs=[conversation_id],
+    outputs=[conversation_id],
+)
 
-        # Load initial leaderboard data
-        leaderboard = load_initial_language_data()
+def initialize_app():
+    """Initialize the app with session ID, language, and leaderboard data"""
+    global LANGUAGES
+    LANGUAGES = load_languages()
+    language_choices = list(LANGUAGES.keys())
+    default_language = language_choices[0] if language_choices else "English"
 
-        # Return exactly 3 values as expected
-        return str(uuid.uuid4()), default_language, leaderboard
+    # Load initial leaderboard data
+    leaderboard = load_initial_language_data()
 
-    def toggle_admin_panel(visible):
-        return gr.Accordion(visible=not visible)
+    # Return exactly 3 values as expected
+    return str(uuid.uuid4()), default_language, leaderboard
 
-    def handle_set_count(language, count):
-        updated_data = set_language_data_points(language, int(count))
-        save_language_data_points()
-        return update_leaderboard_html(updated_data), updated_data
+def toggle_admin_panel(visible):
+    return gr.Accordion(visible=not visible)
 
-    demo.load(
-        fn=initialize_app,
-        inputs=None,
-        outputs=[
-            session_id,
-            language,
-            leaderboard_data
-        ]
-    ).then(
-        fn=update_leaderboard_html,
-        inputs=[leaderboard_data],
-        outputs=[leaderboard_html]
-    )
+def handle_set_count(language, count):
+    updated_data = set_language_data_points(language, int(count))
+    save_language_data_points()
+    return update_leaderboard_html(updated_data), updated_data
 
-    add_language_btn.click(
-        fn=lambda: gr.Group(visible=True),
-        outputs=[add_language_modal]
-    )
+demo.load(
+    fn=initialize_app,
+    inputs=None,
+    outputs=[
+        session_id,
+        language,
+        leaderboard_data
+    ]
+).then(
+    fn=update_leaderboard_html,
+    inputs=[leaderboard_data],
+    outputs=[leaderboard_html]
+)
 
-    cancel_language_btn.click(
-        fn=lambda: gr.Group(visible=False),
-        outputs=[add_language_modal]
-    )
+add_language_btn.click(
+    fn=lambda: gr.Group(visible=True),
+    outputs=[add_language_modal]
+)
 
-    save_language_btn.click(
-        fn=save_new_language,
-        inputs=[new_lang_name, new_system_prompt],
-        outputs=[add_language_modal, refresh_html, language_dropdown]
-    )
+cancel_language_btn.click(
+    fn=lambda: gr.Group(visible=False),
+    outputs=[add_language_modal]
+)
 
-    # Connect the events
-    submit_email_btn.click(
-        fn=lambda email, name, consent: "Thank you for your submission!" if consent else "Please provide consent to submit",
-        inputs=[contributor_email, contributor_name, email_consent],
-        outputs=[email_submit_status]
-    ).then(
-        fn=lambda email, name, consent: save_contributor_email(email, name) if consent else None,
-        inputs=[contributor_email, contributor_name, email_consent],
-        outputs=None
-    )
+save_language_btn.click(
+    fn=save_new_language,
+    inputs=[new_lang_name, new_system_prompt],
+    outputs=[add_language_modal, refresh_html, language_dropdown]
+)
 
-    # Add the necessary functions
-    def authenticate(password):
-        """Authenticate the admin password"""
-        correct_password = os.getenv("ADMIN_PASSWORD", "default_admin_password")
-        if password == correct_password:
-            return "✅ Authentication successful. You can now manage languages.", gr.Group(visible=True)
-        else:
-            return "❌ Incorrect password. Please try again.", gr.Group(visible=False)
+# Connect the events
+submit_email_btn.click(
+    fn=lambda email, name, consent: "Thank you for your submission!" if consent else "Please provide consent to submit",
+    inputs=[contributor_email, contributor_name, email_consent],
+    outputs=[email_submit_status]
+).then(
+    fn=lambda email, name, consent: save_contributor_email(email, name) if consent else None,
+    inputs=[contributor_email, contributor_name, email_consent],
+    outputs=None
+)
 
-    def load_languages_file():
-        """Load the languages file from persistent storage"""
+# Add the necessary functions
+def authenticate(password):
+    """Authenticate the admin password"""
+    correct_password = os.getenv("ADMIN_PASSWORD", "default_admin_password")
+    if password == correct_password:
+        return "✅ Authentication successful. You can now manage languages.", gr.Group(visible=True)
+    else:
+        return "❌ Incorrect password. Please try again.", gr.Group(visible=False)
+
+def load_languages_file():
+    """Load the languages file from persistent storage"""
+    languages_path, _ = get_persistent_storage_path("languages.json")
+    try:
+        with open(languages_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return content, "Languages file loaded successfully."
+    except Exception as e:
+        return "", f"Error loading languages file: {str(e)}"
+
+def save_languages_file(json_content):
+    """Save the languages file to persistent storage"""
+    try:
+        # Validate JSON format
+        languages_dict = json.loads(json_content)
+
+        # Basic validation
+        if not isinstance(languages_dict, dict):
+            return "Error: Content must be a JSON object (dictionary)."
+
+        for key, value in languages_dict.items():
+            if not isinstance(key, str) or not isinstance(value, str):
+                return f"Error: Keys and values must be strings. Issue with: {key}: {value}"
+
+        # Save to file
         languages_path, _ = get_persistent_storage_path("languages.json")
-        try:
-            with open(languages_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            return content, "Languages file loaded successfully."
-        except Exception as e:
-            return "", f"Error loading languages file: {str(e)}"
+        with open(languages_path, "w", encoding="utf-8") as f:
+            f.write(json_content)
 
-    def save_languages_file(json_content):
-        """Save the languages file to persistent storage"""
-        try:
-            # Validate JSON format
-            languages_dict = json.loads(json_content)
+        return f"✅ Languages file updated successfully with {len(languages_dict)} languages."
+    except json.JSONDecodeError as e:
+        return f"❌ Invalid JSON format: {str(e)}"
+    except Exception as e:
+        return f"❌ Error saving languages file: {str(e)}"
 
-            # Basic validation
-            if not isinstance(languages_dict, dict):
-                return "Error: Content must be a JSON object (dictionary)."
+# Connect the event handlers
+auth_button.click(
+    fn=authenticate,
+    inputs=[admin_password],
+    outputs=[auth_status, lang_editor_group]
+)
 
-            for key, value in languages_dict.items():
-                if not isinstance(key, str) or not isinstance(value, str):
-                    return f"Error: Keys and values must be strings. Issue with: {key}: {value}"
+load_button.click(
+    fn=load_languages_file,
+    inputs=[],
+    outputs=[lang_json_editor, result_message]
+)
 
-            # Save to file
-            languages_path, _ = get_persistent_storage_path("languages.json")
-            with open(languages_path, "w", encoding="utf-8") as f:
-                f.write(json_content)
+save_button.click(
+    fn=save_languages_file,
+    inputs=[lang_json_editor],
+    outputs=[result_message]
+)
 
-            return f"✅ Languages file updated successfully with {len(languages_dict)} languages."
-        except json.JSONDecodeError as e:
-            return f"❌ Invalid JSON format: {str(e)}"
-        except Exception as e:
-            return f"❌ Error saving languages file: {str(e)}"
+admin_toggle.click(
+    fn=toggle_admin_panel,
+    inputs=[admin_panel],
+    outputs=[admin_panel]
+)
 
-    # Connect the event handlers
-    auth_button.click(
-        fn=authenticate,
-        inputs=[admin_password],
-        outputs=[auth_status, lang_editor_group]
-    )
-
-    load_button.click(
-        fn=load_languages_file,
-        inputs=[],
-        outputs=[lang_json_editor, result_message]
-    )
-
-    save_button.click(
-        fn=save_languages_file,
-        inputs=[lang_json_editor],
-        outputs=[result_message]
-    )
-
-    admin_toggle.click(
-        fn=toggle_admin_panel,
-        inputs=[admin_panel],
-        outputs=[admin_panel]
-    )
-
-    set_count_btn.click(
-        fn=handle_set_count,
-        inputs=[admin_language, admin_count],
-        outputs=[leaderboard_html, leaderboard_data]
-    )
+set_count_btn.click(
+    fn=handle_set_count,
+    inputs=[admin_language, admin_count],
+    outputs=[leaderboard_html, leaderboard_data]
+)
 
 demo.launch()
