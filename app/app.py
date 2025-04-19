@@ -1124,44 +1124,42 @@ with gr.Blocks(css=css, js=js) as demo:
             gr.Markdown(USER_AGREEMENT)
         consent_btn = gr.Button("I agree")
 
-    # Add a contact footer at the bottom of the page
-    with gr.Row(elem_classes=["footer-banner"]) as footer_banner:
-        gr.Markdown("""
-        ### Contact Us
-        Have questions, requests, or ideas for how we can improve? Email us at: **jen_ben@mit.edu**
-        """)
-
     # Add a subtle language management section at the bottom
     with gr.Row(elem_classes=["footer-section"]) as footer_section:
+        with gr.Column(elem_classes=["footer-content"]):
+            gr.Markdown("""
+            ### Thank You for Contributing
+            We'd like to thank you for using FeeL and contributing to the improvement of multilingual language models.
+            If you'd like us to reach out to you, please leave your email below.
+
+            **Contact Us**: Have questions, requests, or ideas? Email us at: **jen_ben@mit.edu**
+            """)
+
+            with gr.Row():
+                with gr.Column(scale=3):
+                    contributor_email = gr.Textbox(
+                        label="Your Email (optional)",
+                        placeholder="email@example.com",
+                        type="email"
+                    )
+                with gr.Column(scale=3):
+                    contributor_name = gr.Textbox(
+                        label="Your Name (optional)",
+                        placeholder="Your name"
+                    )
+                with gr.Column(scale=2):
+                    email_consent = gr.Checkbox(
+                        label="I consent to being contacted",
+                        value=False
+                    )
+
+            with gr.Row():
+                submit_email_btn = gr.Button("Submit")
+                email_submit_status = gr.Markdown("")
+
+        # Admin tools section (keep this part)
         with gr.Accordion("🔧 Admin Language Management", open=False, elem_classes=["admin-tools-accordion"]):
-            # Removed the "Language File Manager" headline
-
-            # Password authentication - button below password field
-            admin_password = gr.Textbox(
-                type="password",
-                label="Admin Password",
-                placeholder="Enter admin password"
-            )
-            auth_button = gr.Button("Authenticate", size="sm")
-
-            auth_status = gr.Markdown("")
-
-            # File management (initially hidden)
-            with gr.Group(visible=False) as lang_editor_group:
-                gr.Markdown("Edit the languages JSON file below:", elem_classes=["edit-instructions"])
-
-                # Language file editor
-                lang_json_editor = gr.Code(
-                    language="json",
-                    label="Languages JSON",
-                    lines=15
-                )
-
-                with gr.Row():
-                    load_button = gr.Button("Load Current Languages", size="sm")
-                    save_button = gr.Button("Save Changes", size="sm", elem_classes=["yellow-btn"])
-
-                result_message = gr.Markdown("")
+            # ... existing admin tools code ...
 
     # Check consent on page load and show/hide components appropriately
     def initialize_consent_status():
@@ -1174,7 +1172,6 @@ with gr.Blocks(css=css, js=js) as demo:
             gr.Group(visible=has_consent),  # main_app
             gr.Group(visible=not has_consent),  # consent_overlay
             gr.Group(visible=not has_consent),  # consent_modal
-            gr.Group(visible=has_consent),  # footer_banner
             gr.Group(visible=has_consent)   # footer_section
         )
 
@@ -1186,7 +1183,7 @@ with gr.Blocks(css=css, js=js) as demo:
     ).then(
         fn=update_visibility,
         inputs=user_consented,
-        outputs=[main_app, consent_overlay, consent_modal, footer_banner, footer_section]
+        outputs=[main_app, consent_overlay, consent_modal, footer_section]
     )
 
     # Update the consent button click handler
@@ -1197,7 +1194,7 @@ with gr.Blocks(css=css, js=js) as demo:
     ).then(
         fn=update_visibility,
         inputs=user_consented,
-        outputs=[main_app, consent_overlay, consent_modal, footer_banner, footer_section]
+        outputs=[main_app, consent_overlay, consent_modal, footer_section]
     )
 
     ##############################
