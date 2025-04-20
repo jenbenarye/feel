@@ -24,6 +24,7 @@ from pandas import DataFrame
 from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
 import threading
 from collections import defaultdict
+from datasets import load_dataset
 
 
 BASE_MODEL = os.getenv("MODEL", "google/gemma-3-12b-pt")
@@ -37,6 +38,11 @@ TEXT_ONLY = (
     if str(os.getenv("TEXT_ONLY")).lower() == "true"
     else False
 )
+
+# os.environ["HF_DATASETS_CACHE"] = "/data/datasets_cache"
+
+# # caches dataset after first download
+# dataset = load_dataset("feel-fl/feel-feedback")
 
 
 def create_inference_client(
@@ -136,6 +142,49 @@ def load_languages() -> dict[str, str]:
 
 LANGUAGES = load_languages()
 
+def update_language_counts_from_dataset():
+    """update language data points count from the dataset"""
+    data_file, use_persistent = get_persistent_storage_path("language_data_points.json")
+    
+    if data_file.exists():
+        with open(data_file, "r", encoding="utf-8") as f:
+            try:
+                data = json.load(f)
+            except json.JSONDecodeError:
+                print("error reading data file. Creating new data.")
+                data = {}
+    else:
+        data = {}
+    
+    cache_dir, _ = get_persistent_storage_path("datasets_cache")
+    os.environ["HF_DATASETS_CACHE"] = str(cache_dir)
+    
+    try:
+        # load the dataset (cached after first download - note that this might need to be changed because 
+        #  we dont want it to only refer to some old cached version if there have been updates since)
+        print("loading dataset from HuggingFace...")
+        dataset = load_dataset("feel-fl/feel-feedback")
+        
+        train_dataset = dataset["train"]
+        df = train_dataset.to_pandas()
+        
+        if 'language' in df.columns:
+            language_counts = df['language'].value_counts().to_dict()
+            for lang, count in language_counts.items():
+                data[lang] = count
+                
+            print(f"Updated counts from dataset for {len(language_counts)} languages")
+        else:
+            print("Warning: No 'language' column found in the dataset.")
+            print("Available columns:", df.columns.tolist())
+    except Exception as e:
+        print(f"Error updating from dataset: {e}")
+    
+    with open(data_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    
+    return data
+
 USER_AGREEMENT = """
 You have been asked to participate in a research study conducted by Lingo Lab from the Computer Science and Artificial Intelligence Laboratory at the Massachusetts Institute of Technology (M.I.T.), together with huggingface.
 
@@ -159,9 +208,6 @@ def add_user_message(history, message):
 
 
 def format_system_message(language: str):
-    # Use a higher temperature with randomization for more diversity
-    random_temp = random.uniform(1.3, 2.0)  # More random between 1.3 and 2.0
-
     system_message = [
         {
             "role": "system",
@@ -172,8 +218,7 @@ def format_system_message(language: str):
             "content": f"Start by asking me a question in {language}."
         }
     ]
-    response = call_pipeline(system_message, temperature=random_temp)
-
+    response = call_pipeline(system_message)
     new_system_message = [
         {
             "role": "system",
@@ -287,10 +332,8 @@ def add_fake_like_data(
 
 
 @spaces.GPU
-def call_pipeline(messages: list, temperature: float = 0.7):
+def call_pipeline(messages: list):
     """Call the appropriate model pipeline based on configuration"""
-
-
     if ZERO_GPU:
         tokenizer = CLIENT["tokenizer"]
         # Ensure messages follow the proper alternating pattern
@@ -334,9 +377,8 @@ def call_pipeline(messages: list, temperature: float = 0.7):
             clean_up_tokenization_spaces=False,
             max_length=2000,
             return_full_text=False,
-            temperature=temperature,
+            temperature=0.7,
             do_sample=True,
-            top_p=0.9,  # Add top_p sampling for more diversity
         )
 
         return response[0]["generated_text"]
@@ -345,7 +387,6 @@ def call_pipeline(messages: list, temperature: float = 0.7):
             messages,
             clean_up_tokenization_spaces=False,
             max_length=2000,
-            temperature=temperature,
         )
         return response[0]["generated_text"][-1]["content"]
 
@@ -361,18 +402,15 @@ def respond(
     Return the history with the new message"""
     messages = format_history_as_messages(history)
 
-    # Use provided temperature or default to 0.7
-    temp = temperature if temperature is not None else 0.7
-
     if ZERO_GPU:
-        content = call_pipeline(messages, temperature=temp)
+        content = call_pipeline(messages)
     else:
         response = CLIENT.chat.completions.create(
             messages=messages,
             max_tokens=2000,
             stream=False,
             seed=seed,
-            temperature=temp,
+            temperature=temperature,
         )
         content = response.choices[0].message.content
 
@@ -416,7 +454,7 @@ def wrangle_like_data(x: gr.LikeData, history) -> DataFrame:
             message["metadata"] = {}
         elif not isinstance(message["metadata"], dict):
             message["metadata"] = message["metadata"].__dict__
-
+            
         rating = message["metadata"].get("title")
         if rating == "liked":
             message["rating"] = 1
@@ -529,21 +567,17 @@ def wrangle_retry_data(
         language=language,
     )
 
-    # Use randomized temperature for more varied responses when retrying
-    random_temp = random.randint(70, 150) / 100  # Between 0.7 and 1.5
-    random_seed = random.randint(0, 1000000)
-
     # Return the history without a new message
     history = respond(
         history=history[:-1],
         language=language,
-        temperature=random_temp,
-        seed=random_seed,
+        temperature=random.randint(1, 100) / 100,
+        seed=random.randint(0, 1000000),
     )
     return history, update_dataframe(dataframe, history)
 
 # Global variables for tracking language data points
-LANGUAGE_DATA_POINTS = defaultdict(int)
+LANGUAGE_DATA_POINTS = update_language_counts_from_dataset()
 language_data_lock = threading.Lock()
 
 def get_leaderboard_data():
@@ -568,7 +602,7 @@ def set_language_data_points(language, count):
 def load_initial_language_data():
     """Load initial language data points from persistent storage or default values"""
     data_points_path, use_persistent = get_persistent_storage_path("language_data_points.json")
-
+    
     if data_points_path.exists():
         try:
             with open(data_points_path, "r", encoding="utf-8") as f:
@@ -578,17 +612,17 @@ def load_initial_language_data():
                     LANGUAGE_DATA_POINTS.update(data)
         except Exception as e:
             print(f"Error loading language data points: {e}")
-
+    
     for lang in LANGUAGES.keys():
         if lang not in LANGUAGE_DATA_POINTS:
             LANGUAGE_DATA_POINTS[lang] = 0
-
+            
     return get_leaderboard_data()
 
 def save_language_data_points():
     """Save language data points to persistent storage"""
     data_points_path, use_persistent = get_persistent_storage_path("language_data_points.json")
-
+    
     try:
         with language_data_lock:
             with open(data_points_path, "w", encoding="utf-8") as f:
@@ -616,7 +650,7 @@ def submit_conversation(dataframe, conversation_id, session_id, language):
     save_feedback(input_object=conversation_data)
     leaderboard_data = increment_language_data_point(language)
     save_language_data_points()
-
+    
     return (gr.Dataframe(value=None, interactive=False), [], leaderboard_data)
 
 
@@ -948,12 +982,44 @@ js = '''function js(){
     }
 }'''
 
+def render_leaderboard():
+    """Render the leaderboard HTML"""
+    counts = update_language_counts_from_dataset()
+    languages = LANGUAGES
+    
+    sorted_langs = sorted(
+        [(lang, counts.get(lang, 0)) for lang in languages.keys()],
+        key=lambda x: x[1],
+        reverse=True
+    )
+    
+    html = """
+    <table class="leaderboard">
+      <tr>
+        <th>Rank</th>
+        <th>Language</th>
+        <th>Data Points</th>
+      </tr>
+    """
+    
+    for i, (lang, count) in enumerate(sorted_langs):
+        html += f"""
+        <tr>
+          <td>{i+1}</td>
+          <td>{lang}</td>
+          <td>{count}</td>
+        </tr>
+        """
+    
+    html += "</table>"
+    return html
+
 
 with gr.Blocks(css=css, js=js) as demo:
     user_consented = gr.State(value=False)
     language = gr.State(value="English")  # Default language state
     leaderboard_data = gr.State([])
-
+    
     # Main application interface (initially hidden)
     with gr.Group() as main_app:
         with gr.Row():
@@ -1029,36 +1095,71 @@ with gr.Blocks(css=css, js=js) as demo:
                         elem_classes=["add-language-btn"]
                     )
 
+                
+
                 # Right column with leaderboard
                 with gr.Column(scale=3, elem_classes=["leaderboard-container"]):
                     gr.Markdown("# Language Leaderboard", elem_classes=["leaderboard-title"])
                     leaderboard_html = gr.HTML("Loading leaderboard...")
+                    refresh_leaderboard_btn = gr.Button("Refresh Counts from Dataset")
+                    leaderboard_html.value = render_leaderboard()
 
+                    # HELPERS:
+                    def update_func():
+                        update_language_counts_from_dataset()
+                        return render_leaderboard()
+                    
+
+                    def set_language_count(language, count):
+                        """admin function to manually set language count"""
+                        if not language:
+                            return render_leaderboard()
+                            
+                        data_file, _ = get_persistent_storage_path("language_data_points.json")
+                        
+                        if data_file.exists():
+                            with open(data_file, "r", encoding="utf-8") as f:
+                                try:
+                                    data = json.load(f)
+                                except json.JSONDecodeError:
+                                    data = {}
+                        else:
+                            data = {}
+                        data[language] = int(count)
+                        
+                        with open(data_file, "w", encoding="utf-8") as f:
+                            json.dump(data, f, ensure_ascii=False, indent=2)
+                        
+                        return render_leaderboard()
+                    
+                    
+                    refresh_leaderboard_btn.click(
+                        update_func,
+                        outputs=leaderboard_html
+                    )
+
+                   
+
+                    
                     with gr.Accordion("Admin Controls", open=False, visible=False) as admin_panel:
                         with gr.Row():
                             admin_language = gr.Dropdown(choices=list(LANGUAGES.keys()), label="Language")
                             admin_count = gr.Number(value=0, label="Data Points")
                         set_count_btn = gr.Button("Set Count")
-
+                        
                     # toggle button for admin panel?
                     admin_toggle = gr.Button("Admin Controls", visible=True)
+                
+                    set_count_btn.click(
+                        set_language_count,
+                        inputs=[admin_language, admin_count],
+                        outputs=leaderboard_html
+                    )
 
-                # update leaderboard HTML
-                def update_leaderboard_html(data):
-                    if not data:
-                        return "Loading leaderboard..."
-
-                    html = "<div class='leaderboard-content'>"
-                    for idx, (lang, count) in enumerate(data):
-                        html += f"""
-                        <div class='leaderboard-item'>
-                            <span class='leaderboard-rank'>#{idx+1}</span>
-                            <span class='leaderboard-language'>{lang}</span>
-                            <span class='leaderboard-count'>{count}</span>
-                        </div>
-                        """
-                    html += "</div>"
-                    return html
+                    admin_toggle.click(
+                        gr.update(visible=True),
+                        outputs=admin_panel
+                    )
 
 
                 # Create a hidden group instead of a modal
@@ -1191,13 +1292,9 @@ with gr.Blocks(css=css, js=js) as demo:
 
     # Update the consent button click handler
     consent_btn.click(
-        fn=lambda: True,
-        outputs=user_consented,
-        js="() => set_cookie('feel_consent', 'true')"
-    ).then(
-        fn=update_visibility,
-        inputs=user_consented,
-        outputs=[main_app, consent_overlay, consent_modal, footer_banner, footer_section]
+        fn=show_main_app,
+        inputs=[],
+        outputs=[landing_page, main_app, user_consented]
     )
 
     ##############################
@@ -1263,32 +1360,27 @@ with gr.Blocks(css=css, js=js) as demo:
         outputs=[conversation_id],
     )
 
-    def initialize_app():
-        """Initialize the app with session ID, language, and leaderboard data"""
+    def on_app_load():
         global LANGUAGES
         LANGUAGES = load_languages()
         language_choices = list(LANGUAGES.keys())
         default_language = language_choices[0] if language_choices else "English"
 
-        # Load initial leaderboard data
-        leaderboard = load_initial_language_data()
-
-        # Return exactly 3 values as expected
-        return str(uuid.uuid4()), default_language, leaderboard
-
+        return str(uuid.uuid4()), gr.Dropdown(choices=language_choices, value=default_language), default_language
+    
     def toggle_admin_panel(visible):
         return gr.Accordion(visible=not visible)
-
+    
     def handle_set_count(language, count):
         updated_data = set_language_data_points(language, int(count))
         save_language_data_points()
         return update_leaderboard_html(updated_data), updated_data
-
+    
     demo.load(
-        fn=initialize_app,
+        fn=lambda: (on_app_load(), load_initial_language_data()),
         inputs=None,
         outputs=[
-            session_id,
+            session_id, 
             language,
             leaderboard_data
         ]
@@ -1393,7 +1485,7 @@ with gr.Blocks(css=css, js=js) as demo:
         inputs=[admin_panel],
         outputs=[admin_panel]
     )
-
+    
     set_count_btn.click(
         fn=handle_set_count,
         inputs=[admin_language, admin_count],

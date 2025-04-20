@@ -56,5 +56,5 @@ def set_initial_counts():
         print("Please provide both --language and --count arguments")
         parser.print_help()
 
-if __name__ == "__main__":
-    set_initial_counts()
+# if __name__ == "__main__":
+    # set_initial_counts()
