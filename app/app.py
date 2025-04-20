@@ -1149,6 +1149,9 @@ with gr.Blocks(css=css, js=js) as demo:
                         
                     # toggle button for admin panel?
                     admin_toggle = gr.Button("Admin Controls", visible=True)
+                    def toggle_admin_view():
+                        return gr.update(visible=True)
+
                 
                     set_count_btn.click(
                         set_language_count,
@@ -1157,7 +1160,7 @@ with gr.Blocks(css=css, js=js) as demo:
                     )
 
                     admin_toggle.click(
-                        gr.update(visible=True),
+                        toggle_admin_view,
                         outputs=admin_panel
                     )
 
