@@ -1381,7 +1381,7 @@ with gr.Blocks(css=css, js=js) as demo:
     def handle_set_count(language, count):
         updated_data = set_language_data_points(language, int(count))
         save_language_data_points()
-        return update_leaderboard_html(updated_data), updated_data
+        return render_leaderboard(), updated_data
     
     demo.load(
         fn=lambda: (on_app_load(), load_initial_language_data()),
@@ -1392,7 +1392,7 @@ with gr.Blocks(css=css, js=js) as demo:
             leaderboard_data
         ]
     ).then(
-        fn=update_leaderboard_html,
+        fn=render_leaderboard,
         inputs=[leaderboard_data],
         outputs=[leaderboard_html]
     )
