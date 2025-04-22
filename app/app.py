@@ -1293,24 +1293,15 @@ with gr.Blocks(css=css, js=js) as demo:
         outputs=[main_app, consent_overlay, consent_modal, footer_banner, footer_section]
     )
 
-    # Update the consent button click handler
-    def accept_consent():
-        """Handle user accepting the consent agreement"""
-        return True
-
+# Update the consent button click handler
     consent_btn.click(
-        fn=accept_consent,
-        inputs=[],
-        outputs=[user_consented]
+        fn=lambda: True,
+        outputs=user_consented,
+        js="() => set_cookie('feel_consent', 'true')"
     ).then(
         fn=update_visibility,
-        inputs=[user_consented],
+        inputs=user_consented,
         outputs=[main_app, consent_overlay, consent_modal, footer_banner, footer_section]
-    ).then(
-        fn=lambda: "true",
-        inputs=[],
-        outputs=[],
-        _js="(val) => window.set_cookie('feel_consent', 'true')"
     )
 
     ##############################
